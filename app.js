@@ -1637,39 +1637,6 @@ async function importConfigFromJson(file) {
   reader.readAsText(file);
 }
 
-// Auto-hydrate persisted tracks from IndexedDB on page start (deduplicating)
-async function hydrateFromIndexedDB() {
-  try {
-    const storedAudios = await getAllStoredAudios();
-    if (storedAudios && storedAudios.length > 0) {
-      const existingIds = new Set([...state.musicPool, ...state.jinglesPool].map(t => t.id));
-      storedAudios.forEach(item => {
-        if (existingIds.has(item.id)) return; // Skip if already present
-        const url = URL.createObjectURL(item.blob);
-        const track = {
-          id: item.id,
-          title: item.title || item.fileName || 'Pista Local',
-          fileName: item.fileName || item.title,
-          type: item.type || 'music',
-          source: 'local',
-          url: url,
-          blob: item.blob,
-          duration: null
-        };
-        if (item.type === 'jingle') {
-          state.jinglesPool.push(track);
-        } else {
-          state.musicPool.push(track);
-        }
-        existingIds.add(item.id);
-      });
-      rebuildQueue();
-    }
-  } catch (err) {
-    console.warn("Could not load stored audio:", err);
-  }
-}
-
 // Attach JSON Import/Export listeners
 document.getElementById('exportJsonBtn').addEventListener('click', exportConfigToJson);
 const importInput = document.getElementById('importJsonInput');
@@ -1698,8 +1665,9 @@ window.addEventListener('keydown', (e) => {
 const savedTheme = localStorage.getItem('audiomix_theme') || 'dark';
 applyTheme(savedTheme);
 
-// Initialize Lucide Icons & Lists & restore IndexedDB
+// Initialize Lucide Icons & clean initial UI (empty until JSON or files are loaded)
 lucide.createIcons();
 renderAllLists();
-hydrateFromIndexedDB();
+
+
 
