@@ -274,6 +274,9 @@ export function stopVisualizer() {
   });
 }
 
+export let isSeeking = false;
+export function setIsSeeking(val) { isSeeking = val; }
+
 export function startProgressTracking() {
   if (progressTimer) clearInterval(progressTimer);
   progressTimer = setInterval(() => {
@@ -284,7 +287,9 @@ export function startProgressTracking() {
         if (dur > 0) {
           elements.currentTime.textContent = formatTime(cur);
           elements.totalDuration.textContent = formatTime(dur);
-          elements.trackProgress.value = (cur / dur) * 100;
+          if (!isSeeking) {
+            elements.trackProgress.value = (cur / dur) * 100;
+          }
         }
       } catch(e){}
     }
@@ -298,6 +303,8 @@ export function updateProgress() {
     const dur = p.duration || 1;
     elements.currentTime.textContent = formatTime(cur);
     elements.totalDuration.textContent = formatTime(dur);
-    elements.trackProgress.value = (cur / dur) * 100;
+    if (!isSeeking) {
+      elements.trackProgress.value = (cur / dur) * 100;
+    }
   }
 }

@@ -6,7 +6,7 @@ import { saveAudioBlob, clearStoredAudios } from './js/db.js';
 import { triggerTransitionBridge } from './js/chime.js';
 import { parseYouTubeInput, fetchPlaylistItems } from './js/youtube.js';
 import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js';
-import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer } from './js/player.js';
+import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js';
 import { exportConfigToJson, importConfigFromJson } from './js/storage.js';
 
 // Local Audio Uploader (Music)
@@ -238,14 +238,53 @@ if (elements.autoPlayToggle) {
   });
 }
 
-// Scrubbing (Seek bar)
+// Scrubbing (Seek bar / Adelantar y retrasar música)
+elements.trackProgress.addEventListener('mousedown', () => { setIsSeeking(true); });
+elements.trackProgress.addEventListener('touchstart', () => { setIsSeeking(true); });
+
 elements.trackProgress.addEventListener('input', (e) => {
+  setIsSeeking(true);
   const pct = parseFloat(e.target.value) / 100;
   if (state.activeSourceType === 'local') {
     const p = getActiveLocalPlayer();
-    if (p.duration) p.currentTime = pct * p.duration;
+    if (p && p.duration) {
+      p.currentTime = pct * p.duration;
+      elements.currentTime.textContent = formatTime(p.currentTime);
+    }
+  } else if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.getDuration && ytPlayer.seekTo) {
+    try {
+      const dur = ytPlayer.getDuration();
+      if (dur > 0) {
+        const targetTime = pct * dur;
+        ytPlayer.seekTo(targetTime, true);
+        elements.currentTime.textContent = formatTime(targetTime);
+      }
+    } catch (err) {
+      console.warn("YouTube seek error:", err);
+    }
   }
 });
+
+elements.trackProgress.addEventListener('change', (e) => {
+  const pct = parseFloat(e.target.value) / 100;
+  if (state.activeSourceType === 'local') {
+    const p = getActiveLocalPlayer();
+    if (p && p.duration) {
+      p.currentTime = pct * p.duration;
+    }
+  } else if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.getDuration && ytPlayer.seekTo) {
+    try {
+      const dur = ytPlayer.getDuration();
+      if (dur > 0) {
+        ytPlayer.seekTo(pct * dur, true);
+      }
+    } catch (err) {}
+  }
+  setIsSeeking(false);
+});
+
+elements.trackProgress.addEventListener('mouseup', () => { setIsSeeking(false); });
+elements.trackProgress.addEventListener('touchend', () => { setIsSeeking(false); });
 
 // Bind Local Deck Listeners
 [elements.deckA, elements.deckB].forEach(deck => {
