@@ -1694,11 +1694,15 @@ if (elements.transitionFileInput) {
 }
 
 // Crossfade Slider Listener
-elements.crossfadeSlider.addEventListener('input', (e) => {
-  const val = parseFloat(e.target.value);
-  state.crossfadeDuration = val;
-  elements.crossfadeValueDisplay.textContent = `${val.toFixed(1)} seg`;
-});
+if (elements.crossfadeSlider) {
+  elements.crossfadeSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    state.crossfadeDuration = val;
+    if (elements.crossfadeValueDisplay) {
+      elements.crossfadeValueDisplay.textContent = `${val.toFixed(1)} seg`;
+    }
+  });
+}
 
 // Tabs Switcher
 function switchTab(tab) {
