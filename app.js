@@ -1804,16 +1804,21 @@ async function exportConfigToJson() {
   const jsonStr = JSON.stringify(data);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const timestamp = new Date().toISOString().slice(0,10);
+  const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = months[now.getMonth()];
+  const year = now.getFullYear();
+  const fileName = `AudioMix_${day}_${month}_${year}.json`;
+
   a.href = url;
-  a.download = `audiomix_completo_${timestamp}.json`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast("¡Configuración y audios exportados exitosamente a JSON!", "success");
+  showToast(`¡Exportado como "${fileName}"!`, "success");
 }
 
 async function importConfigFromJson(file) {
