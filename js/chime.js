@@ -57,22 +57,19 @@ export function playRadioChime(volume = 1.0, isJingleNext = false) {
       const now = ctx.currentTime;
 
       if (isJingleNext) {
-        // Broadcaster Commercial Identification Chime (Repeating 3-burst airport/radio style fanfare)
+        // Broadcast Radio Double Chime (2 Campanadas dobles de radio broadcast claras y brillantes)
         const sequence = [
-          // Arpegio 1
-          { freq: 1046.50, time: now + 0.00, dur: 0.7, vol: 0.85 },
-          { freq: 1318.51, time: now + 0.14, dur: 0.7, vol: 0.85 },
-          { freq: 1567.98, time: now + 0.28, dur: 0.8, vol: 0.90 },
-          // Pausa corta y Arpegio 2 más agudo
-          { freq: 1318.51, time: now + 0.55, dur: 0.7, vol: 0.90 },
-          { freq: 1567.98, time: now + 0.69, dur: 0.7, vol: 0.95 },
-          { freq: 2093.00, time: now + 0.83, dur: 1.1, vol: 1.00 },
-          // Campanada final de confirmación
-          { freq: 2093.00, time: now + 1.20, dur: 1.2, vol: 0.95 }
+          // Campanada 1 (Ding)
+          { freq: 1174.66, time: now + 0.00, dur: 0.85, vol: 0.90 }, // D6
+          { freq: 1760.00, time: now + 0.18, dur: 1.10, vol: 0.95 }, // A6
+          
+          // Campanada 2 (Ding-Dong de confirmación publicitaria)
+          { freq: 1318.51, time: now + 0.75, dur: 0.85, vol: 0.95 }, // E6
+          { freq: 2093.00, time: now + 0.95, dur: 1.40, vol: 1.00 }  // C7
         ];
 
         sequence.forEach(item => {
-          // Fundamental sine wave
+          // Fundamental pure bell tone
           const osc = ctx.createOscillator();
           const noteGain = ctx.createGain();
 
@@ -89,21 +86,21 @@ export function playRadioChime(volume = 1.0, isJingleNext = false) {
           osc.start(item.time);
           osc.stop(item.time + item.dur + 0.05);
 
-          // Harmonic overtone for realistic metal bell shimmer
+          // Harmonic chime overtone (metálico brillante)
           const harmOsc = ctx.createOscillator();
           const harmGain = ctx.createGain();
           harmOsc.type = 'sine';
           harmOsc.frequency.setValueAtTime(item.freq * 2.76, item.time);
           harmGain.gain.setValueAtTime(0.0001, item.time);
-          harmGain.gain.exponentialRampToValueAtTime(item.vol * 0.25, item.time + 0.015);
-          harmGain.gain.exponentialRampToValueAtTime(0.0001, item.time + (item.dur * 0.5));
+          harmGain.gain.exponentialRampToValueAtTime(item.vol * 0.30, item.time + 0.015);
+          harmGain.gain.exponentialRampToValueAtTime(0.0001, item.time + (item.dur * 0.6));
           harmOsc.connect(harmGain);
           harmGain.connect(masterGain);
           harmOsc.start(item.time);
-          harmOsc.stop(item.time + (item.dur * 0.5) + 0.05);
+          harmOsc.stop(item.time + (item.dur * 0.6) + 0.05);
         });
 
-        setTimeout(resolve, 1850);
+        setTimeout(resolve, 2100);
 
       } else {
         // Regular song-to-song transition
