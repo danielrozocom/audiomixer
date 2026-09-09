@@ -472,7 +472,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
       incomingPlayer.play().then(() => {
         setPlayingUI(true);
         startVisualizer();
-        executeCrossfade(outgoingPlayer, incomingPlayer, state.crossfadeDuration);
+        executeHarmonicCrossfade(outgoingPlayer, incomingPlayer, state.crossfadeDuration);
       }).catch(err => {
         console.error("Crossfade play error:", err);
         incomingPlayer.volume = state.isMuted ? 0 : state.volume;
@@ -501,7 +501,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
     // If we are crossfading from local audio to YouTube
     if (isCrossfadeTransition && previousSourceType === 'local' && state.crossfadeDuration > 0) {
       const outgoingLocal = getActiveLocalPlayer();
-      fadeOutLocal(outgoingLocal, state.crossfadeDuration);
+      fadeOutLocalHarmonic(outgoingLocal, state.crossfadeDuration);
     } else {
       elements.deckA.pause();
       elements.deckB.pause();
@@ -535,7 +535,12 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
           events: {
             onReady: (event) => {
               ytReady = true;
-              event.target.setVolume(state.isMuted ? 0 : state.volume * 100);
+              const targetVol = state.isMuted ? 0 : state.volume * 100;
+              if (isCrossfadeTransition && state.crossfadeDuration > 0) {
+                fadeInYtHarmonic(event.target, targetVol, state.crossfadeDuration);
+              } else {
+                event.target.setVolume(targetVol);
+              }
               event.target.playVideo();
             },
             onStateChange: (event) => {
@@ -554,8 +559,14 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
           }
         });
       } else {
-        // Player already exists, load video
-        ytPlayer.setVolume(state.isMuted ? 0 : state.volume * 100);
+        // Player already exists, load video with harmonic fade in
+        const targetVol = state.isMuted ? 0 : state.volume * 100;
+        if (isCrossfadeTransition && state.crossfadeDuration > 0) {
+          fadeInYtHarmonic(ytPlayer, targetVol, state.crossfadeDuration);
+        } else {
+          ytPlayer.setVolume(targetVol);
+        }
+
         if (track.isPlaylist && track.playlistId) {
           ytPlayer.loadPlaylist({ list: track.playlistId, listType: 'playlist' });
         } else {
@@ -581,22 +592,27 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
   startProgressTracking();
 };
 
-// Smooth Crossfade Interpolation between local players
-function executeCrossfade(outgoing, incoming, durationSec) {
+// ==========================================
+// HARMONIC EQUAL-POWER CROSSFADE ENGINE
+// Uses sinusoidal curves (cos/sin) to maintain constant perceived loudness (-3dB sum)
+// ==========================================
+function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
   state.isCrossfading = true;
   const targetVolume = state.isMuted ? 0 : state.volume;
-  const intervalMs = 50;
+  const intervalMs = 40;
   const totalSteps = Math.max(1, (durationSec * 1000) / intervalMs);
   let step = 0;
 
   const fadeTimer = setInterval(() => {
     step++;
-    const progress = step / totalSteps;
-    const inVol = Math.min(targetVolume, targetVolume * progress);
-    const outVol = Math.max(0, targetVolume * (1 - progress));
+    const progress = Math.min(1, step / totalSteps);
+    // Equal-power crossfade curve:
+    // in: sin(progress * PI/2), out: cos(progress * PI/2)
+    const inGain = Math.sin(progress * (Math.PI / 2));
+    const outGain = Math.cos(progress * (Math.PI / 2));
 
-    incoming.volume = inVol;
-    outgoing.volume = outVol;
+    incoming.volume = Math.max(0, Math.min(1, targetVolume * inGain));
+    outgoing.volume = Math.max(0, Math.min(1, targetVolume * outGain));
 
     if (step >= totalSteps) {
       clearInterval(fadeTimer);
@@ -608,21 +624,48 @@ function executeCrossfade(outgoing, incoming, durationSec) {
   }, intervalMs);
 }
 
-// Fade out outgoing local audio
-function fadeOutLocal(player, durationSec) {
+// Harmonic Fade-Out for Local Audio Deck
+function fadeOutLocalHarmonic(player, durationSec) {
   const initialVol = player.volume;
+  const intervalMs = 40;
+  const totalSteps = Math.max(1, (durationSec * 1000) / intervalMs);
+  let step = 0;
+
+  const fadeTimer = setInterval(() => {
+    step++;
+    const progress = Math.min(1, step / totalSteps);
+    const outGain = Math.cos(progress * (Math.PI / 2));
+    player.volume = Math.max(0, initialVol * outGain);
+
+    if (step >= totalSteps) {
+      clearInterval(fadeTimer);
+      player.pause();
+      player.volume = state.isMuted ? 0 : state.volume;
+    }
+  }, intervalMs);
+}
+
+// Harmonic Fade-In for YouTube Player
+function fadeInYtHarmonic(player, targetVol, durationSec) {
+  if (!player || !player.setVolume) return;
+  try { player.setVolume(0); } catch(e){}
+  
   const intervalMs = 50;
   const totalSteps = Math.max(1, (durationSec * 1000) / intervalMs);
   let step = 0;
 
   const fadeTimer = setInterval(() => {
     step++;
-    const progress = step / totalSteps;
-    player.volume = Math.max(0, initialVol * (1 - progress));
+    const progress = Math.min(1, step / totalSteps);
+    const inGain = Math.sin(progress * (Math.PI / 2));
+    const curVol = Math.round(targetVol * inGain);
+    try {
+      player.setVolume(curVol);
+    } catch(e){}
+
     if (step >= totalSteps) {
       clearInterval(fadeTimer);
-      player.pause();
-      player.volume = state.isMuted ? 0 : state.volume;
+      try { player.setVolume(targetVol); } catch(e){}
     }
   }, intervalMs);
 }
