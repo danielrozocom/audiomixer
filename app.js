@@ -196,16 +196,16 @@ function rebuildQueue() {
   } else if (jinglesList.length === 0) {
     newQueue.push(...musicList);
   } else {
-    while (mIdx < musicList.length || (jIdx < jinglesList.length && musicList.length > 0)) {
+    // Interleave music tracks with jingles: each track included exactly once
+    while (mIdx < musicList.length) {
       for (let i = 0; i < ratio && mIdx < musicList.length; i++) {
-        newQueue.push(musicList[mIdx % musicList.length]);
+        newQueue.push(musicList[mIdx]);
         mIdx++;
       }
       if (jinglesList.length > 0) {
         newQueue.push(jinglesList[jIdx % jinglesList.length]);
         jIdx++;
       }
-      if (mIdx >= musicList.length && jIdx >= jinglesList.length) break;
     }
   }
 
@@ -1503,13 +1503,19 @@ async function importConfigFromJson(file) {
 
       let restoredLocalCount = 0;
 
-      // Helper to process and restore items
+      // Helper to process and restore items with strict deduplication
       const processItems = async (items, defaultType) => {
         if (!Array.isArray(items)) return [];
         const result = [];
+        const seenYt = new Set();
+        const seenTitles = new Set();
+
         for (const item of items) {
           const type = item.type || defaultType;
           if (item.source === 'youtube' && item.ytId) {
+            if (seenYt.has(item.ytId)) continue; // Skip duplicate YouTube videos
+            seenYt.add(item.ytId);
+
             result.push({
               id: item.id || ('yt_' + Math.random().toString(36).substr(2, 9)),
               title: item.title || `YouTube Audio [${item.ytId}]`,
@@ -1520,6 +1526,10 @@ async function importConfigFromJson(file) {
             });
           } else {
             // Local track
+            const normalizedTitle = (item.title || item.fileName || '').trim().toLowerCase();
+            if (normalizedTitle && seenTitles.has(normalizedTitle)) continue; // Skip duplicate local tracks
+            if (normalizedTitle) seenTitles.add(normalizedTitle);
+
             const id = item.id || ((type === 'music' ? 'm_' : 'j_') + Math.random().toString(36).substr(2, 9));
             let blob = null;
             let url = null;
@@ -1574,7 +1584,7 @@ async function importConfigFromJson(file) {
       state.currentIndex = -1;
       rebuildQueue();
       
-      showToast(`¡JSON importado con éxito! (${newMusic.length} música, ${newAds.length} anuncios)`, "success");
+      showToast(`¡JSON importado sin duplicados! (${newMusic.length} música, ${newAds.length} anuncios)`, "success");
 
     } catch(err) {
       console.error("JSON Import error:", err);
@@ -1584,12 +1594,14 @@ async function importConfigFromJson(file) {
   reader.readAsText(file);
 }
 
-// Auto-hydrate persisted tracks from IndexedDB on page start
+// Auto-hydrate persisted tracks from IndexedDB on page start (deduplicating)
 async function hydrateFromIndexedDB() {
   try {
     const storedAudios = await getAllStoredAudios();
     if (storedAudios && storedAudios.length > 0) {
+      const existingIds = new Set([...state.musicPool, ...state.jinglesPool].map(t => t.id));
       storedAudios.forEach(item => {
+        if (existingIds.has(item.id)) return; // Skip if already present
         const url = URL.createObjectURL(item.blob);
         const track = {
           id: item.id,
@@ -1606,9 +1618,9 @@ async function hydrateFromIndexedDB() {
         } else {
           state.musicPool.push(track);
         }
+        existingIds.add(item.id);
       });
       rebuildQueue();
-      showToast(`Se restauraron ${storedAudios.length} pistas guardadas automáticamente`, 'info');
     }
   } catch (err) {
     console.warn("Could not load stored audio:", err);
