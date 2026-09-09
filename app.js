@@ -466,7 +466,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
       return;
     }
 
-    if (isCrossfadeTransition && state.crossfadeDuration > 0) {
+    if (isCrossfadeTransition && (state.crossfadeDuration > 0 || state.transitionMode === 'chime' || state.transitionMode === 'jingle')) {
       const outgoingPlayer = getActiveLocalPlayer();
       state.activeDeck = state.activeDeck === 'A' ? 'B' : 'A';
       const incomingPlayer = getActiveLocalPlayer();
@@ -476,7 +476,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
       incomingPlayer.play().then(() => {
         setPlayingUI(true);
         startVisualizer();
-        executeHarmonicCrossfade(outgoingPlayer, incomingPlayer, state.crossfadeDuration);
+        executeHarmonicCrossfade(outgoingPlayer, incomingPlayer, state.crossfadeDuration, isJingle);
       }).catch(err => {
         console.error("Crossfade play error:", err);
         incomingPlayer.volume = state.isMuted ? 0 : state.volume;
@@ -503,9 +503,16 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
     state.activeSourceType = 'youtube';
     
     // If we are crossfading from local audio to YouTube
-    if (isCrossfadeTransition && previousSourceType === 'local' && state.crossfadeDuration > 0) {
+    if (isCrossfadeTransition && previousSourceType === 'local') {
       const outgoingLocal = getActiveLocalPlayer();
-      fadeOutLocalHarmonic(outgoingLocal, state.crossfadeDuration);
+      if (state.transitionMode === 'chime' || state.transitionMode === 'jingle') {
+        fadeOutLocalHarmonic(outgoingLocal, 0.4);
+        triggerTransitionBridge(isJingle);
+      } else if (state.crossfadeDuration > 0) {
+        fadeOutLocalHarmonic(outgoingLocal, state.crossfadeDuration);
+      } else {
+        outgoingLocal.pause();
+      }
     } else {
       elements.deckA.pause();
       elements.deckB.pause();
@@ -598,9 +605,10 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
 
 // ==========================================
 // RADIO BRIDGE SYNTHESIZER (CAMPANA / CHIME)
-// Generates a crisp studio tubular bell chime bridge via Web Audio API
+// Generates a crisp studio tubular bell chime bridge via Web Audio API.
+// Automatically repeats for an unmistakable alert chime when an AD is next!
 // ==========================================
-function playRadioChime(volume = 0.8) {
+function playRadioChime(volume = 0.8, isJingleNext = false) {
   return new Promise((resolve) => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -608,35 +616,72 @@ function playRadioChime(volume = 0.8) {
       const ctx = new AudioContext();
 
       const chimeGain = ctx.createGain();
-      chimeGain.gain.setValueAtTime(volume * 0.45, ctx.currentTime);
+      chimeGain.gain.setValueAtTime(volume * 0.5, ctx.currentTime);
       chimeGain.connect(ctx.destination);
 
-      // 3 harmonious tubular bell harmonics (C6, E6, G6 chime sweep)
-      const notes = [1046.50, 1318.51, 1567.98];
       const now = ctx.currentTime;
 
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const noteGain = ctx.createGain();
+      if (isJingleNext) {
+        // Double Chime alert signature for commercials/ads (Ascending fanfare chime)
+        // Sweep 1: C6, E6, G6 -> Sweep 2: E6, G6, C7 (Emphasizes incoming commercial)
+        const sequence = [
+          { freq: 1046.50, time: now + 0.00 },
+          { freq: 1318.51, time: now + 0.10 },
+          { freq: 1567.98, time: now + 0.20 },
+          { freq: 1318.51, time: now + 0.45 },
+          { freq: 1567.98, time: now + 0.55 },
+          { freq: 2093.00, time: now + 0.65 },
+        ];
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+        sequence.forEach(item => {
+          const osc = ctx.createOscillator();
+          const noteGain = ctx.createGain();
 
-        noteGain.gain.setValueAtTime(0.001, now + idx * 0.12);
-        noteGain.gain.exponentialRampToValueAtTime(0.6, now + idx * 0.12 + 0.02);
-        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(item.freq, item.time);
 
-        osc.connect(noteGain);
-        noteGain.connect(chimeGain);
+          noteGain.gain.setValueAtTime(0.001, item.time);
+          noteGain.gain.exponentialRampToValueAtTime(0.7, item.time + 0.02);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, item.time + 0.8);
 
-        osc.start(now + idx * 0.12);
-        osc.stop(now + idx * 0.12 + 0.95);
-      });
+          osc.connect(noteGain);
+          noteGain.connect(chimeGain);
 
-      setTimeout(() => {
-        try { ctx.close(); } catch(e){}
-        resolve();
-      }, 750);
+          osc.start(item.time);
+          osc.stop(item.time + 0.85);
+        });
+
+        setTimeout(() => {
+          try { ctx.close(); } catch(e){}
+          resolve();
+        }, 1100);
+
+      } else {
+        // Standard harmonious chime sweep for music tracks
+        const notes = [1046.50, 1318.51, 1567.98];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const noteGain = ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+
+          noteGain.gain.setValueAtTime(0.001, now + idx * 0.12);
+          noteGain.gain.exponentialRampToValueAtTime(0.6, now + idx * 0.12 + 0.02);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
+
+          osc.connect(noteGain);
+          noteGain.connect(chimeGain);
+
+          osc.start(now + idx * 0.12);
+          osc.stop(now + idx * 0.12 + 0.95);
+        });
+
+        setTimeout(() => {
+          try { ctx.close(); } catch(e){}
+          resolve();
+        }, 750);
+      }
     } catch(e) {
       console.warn("Chime synth error", e);
       resolve();
@@ -645,10 +690,10 @@ function playRadioChime(volume = 0.8) {
 }
 
 // Play Transition Cortinilla (Custom audio file or Chime)
-async function triggerTransitionBridge() {
+async function triggerTransitionBridge(isJingleNext = false) {
   if (state.transitionMode === 'cut') return;
   if (state.transitionMode === 'chime') {
-    await playRadioChime(state.isMuted ? 0 : state.volume);
+    await playRadioChime(state.isMuted ? 0 : state.volume, isJingleNext);
   } else if (state.transitionMode === 'jingle' && state.customTransitionUrl) {
     return new Promise((resolve) => {
       const bridgeAudio = new Audio(state.customTransitionUrl);
@@ -661,22 +706,22 @@ async function triggerTransitionBridge() {
     });
   } else if (state.transitionMode === 'jingle') {
     // Fallback to chime if no custom jingle loaded
-    await playRadioChime(state.isMuted ? 0 : state.volume);
+    await playRadioChime(state.isMuted ? 0 : state.volume, isJingleNext);
   }
 }
 
 // ==========================================
 // PROFESSIONAL TRANSITION & S-CURVE ENGINE
 // ==========================================
-async function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
+async function executeHarmonicCrossfade(outgoing, incoming, durationSec, isJingleNext = false) {
   state.isCrossfading = true;
   const targetVolume = state.isMuted ? 0 : state.volume;
 
   if (state.transitionMode === 'chime' || state.transitionMode === 'jingle') {
     // Fade out outgoing first
     fadeOutLocalHarmonic(outgoing, 0.4);
-    // Sound chime or cortinilla bridge
-    await triggerTransitionBridge();
+    // Sound chime or cortinilla bridge (with double alert if ad is coming)
+    await triggerTransitionBridge(isJingleNext);
     // Start incoming cleanly
     incoming.volume = targetVolume;
     state.isCrossfading = false;
