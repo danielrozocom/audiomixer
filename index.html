@@ -13,14 +13,18 @@
   <script>
     (function() {
       try {
-        const saved = localStorage.getItem('audiomix_theme') || 'dark';
+        const saved = localStorage.getItem('audiomix_theme') || 'system';
         if (saved === 'dark' || (saved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');
         }
       } catch (e) {
-        document.documentElement.classList.add('dark');
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
       }
     })();
   </script>

@@ -14,7 +14,7 @@ const state = {
   volume: 1.0, // Full 100% Master Volume always
   isMuted: false,
   activeTab: 'queue',
-  theme: 'dark',      // 'dark', 'light', or 'system'
+  theme: 'system',      // Default theme is 'system'
   activeDeck: 'A',    // 'A' or 'B' for crossfading local audio
   draggedItemIndex: null,
   draggedItemType: null, // 'queue', 'music', or 'jingle'
@@ -1960,8 +1960,8 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Initialize Saved Theme or default
-const savedTheme = localStorage.getItem('audiomix_theme') || 'dark';
+// Initialize Saved Theme (default to 'system')
+const savedTheme = localStorage.getItem('audiomix_theme') || 'system';
 applyTheme(savedTheme);
 
 // Initialize Lucide Icons & clean initial UI (empty until JSON or files are loaded)
