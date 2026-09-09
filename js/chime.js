@@ -117,7 +117,69 @@ export function playRadioChime(volume = 1.0, isJingleNext = false) {
   }
 }
 
-// Play Transition Cortinilla (Custom uploaded jingle or Automatic Radio Chime)
+export const DEFAULT_CHIME_YT_ID = 'SbI3YqGSNPc';
+let ytChimePlayer = null;
+
+export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
+  return new Promise((resolve) => {
+    try {
+      if (!window.YT || !window.YT.Player) {
+        playRadioChime(state.volume, true).then(resolve);
+        return;
+      }
+
+      const timeoutSafety = setTimeout(() => {
+        resolve();
+      }, 3500);
+
+      const onEnded = () => {
+        clearTimeout(timeoutSafety);
+        resolve();
+      };
+
+      if (!ytChimePlayer || !ytChimePlayer.loadVideoById) {
+        ytChimePlayer = new YT.Player('ytChimeDiv', {
+          height: '100%',
+          width: '100%',
+          videoId: videoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+          },
+          events: {
+            onReady: (event) => {
+              event.target.setVolume(state.isMuted ? 0 : 100);
+              event.target.playVideo();
+            },
+            onStateChange: (event) => {
+              if (event.data === YT.PlayerState.ENDED) {
+                onEnded();
+              }
+            },
+            onError: () => {
+              clearTimeout(timeoutSafety);
+              playRadioChime(state.volume, true).then(resolve);
+            }
+          }
+        });
+      } else {
+        ytChimePlayer.setVolume(state.isMuted ? 0 : 100);
+        ytChimePlayer.loadVideoById(videoId);
+        ytChimePlayer.playVideo();
+      }
+    } catch (e) {
+      console.warn("YouTube chime playback error:", e);
+      playRadioChime(state.volume, true).then(resolve);
+    }
+  });
+}
+
+// Play Transition Cortinilla (YouTube Chime SbI3YqGSNPc, Custom uploaded jingle or Automatic Radio Chime)
 export async function triggerTransitionBridge(isJingleNext = false) {
   if (state.customTransitionUrl) {
     return new Promise((resolve) => {
@@ -125,15 +187,19 @@ export async function triggerTransitionBridge(isJingleNext = false) {
       bridgeAudio.volume = state.isMuted ? 0.7 : Math.max(0.3, state.volume);
       bridgeAudio.onended = () => resolve();
       bridgeAudio.onerror = () => {
-        playRadioChime(state.volume, isJingleNext).then(resolve);
+        playYouTubeChime(DEFAULT_CHIME_YT_ID).then(resolve);
       };
       bridgeAudio.play().catch(() => {
-        playRadioChime(state.volume, isJingleNext).then(resolve);
+        playYouTubeChime(DEFAULT_CHIME_YT_ID).then(resolve);
       });
       setTimeout(resolve, 4000);
     });
   }
 
-  // Play the signature broadcast radio chime
-  await playRadioChime(state.volume, isJingleNext);
+  // Play the signature broadcast radio chime from YouTube SbI3YqGSNPc
+  if (isJingleNext) {
+    await playYouTubeChime(DEFAULT_CHIME_YT_ID);
+  } else {
+    await playRadioChime(state.volume, false);
+  }
 }
