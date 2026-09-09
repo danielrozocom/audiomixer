@@ -21,33 +21,52 @@ export function getInactiveLocalPlayer() {
 
 export function setPlayingUI(playing) {
   state.isPlaying = playing;
+  const currentTrack = state.currentIndex >= 0 && state.queue[state.currentIndex] ? state.queue[state.currentIndex] : null;
+  const isJingle = currentTrack && currentTrack.type === 'jingle';
+
+  // Dynamic Theme Colors for Buttons and Accents
+  if (isJingle) {
+    elements.playPauseBtn.className = 'p-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-lg shadow-amber-500/30 transition-all transform active:scale-95 flex items-center justify-center';
+    if (elements.dynamicModePill) {
+      elements.dynamicModePill.className = 'text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center gap-1.5 transition-colors';
+      elements.dynamicModeDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      elements.dynamicModeText.textContent = 'Modo Anuncio / Spot';
+    }
+  } else {
+    elements.playPauseBtn.className = 'p-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all transform active:scale-95 flex items-center justify-center';
+    if (elements.dynamicModePill) {
+      elements.dynamicModePill.className = 'text-xs font-mono px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 transition-colors';
+      elements.dynamicModeDot.className = 'w-2 h-2 rounded-full bg-indigo-500 animate-pulse';
+      elements.dynamicModeText.textContent = 'Modo Música';
+    }
+  }
   
   if (playing) {
     elements.playPauseBtn.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current text-white" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current ${isJingle ? 'text-zinc-950' : 'text-white'}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="6" y="4" width="4" height="16"></rect>
         <rect x="14" y="4" width="4" height="16"></rect>
       </svg>
     `;
     if (elements.engineStatus) {
-      elements.engineStatus.textContent = 'Transmitiendo';
-      elements.engineStatus.className = 'text-emerald-500 dark:text-emerald-400 font-mono font-medium';
+      elements.engineStatus.textContent = isJingle ? 'Anuncio al Aire' : 'Transmitiendo';
+      elements.engineStatus.className = isJingle ? 'text-amber-500 dark:text-amber-400 font-mono font-medium' : 'text-emerald-500 dark:text-emerald-400 font-mono font-medium';
     }
     if (elements.enginePulseDot) {
-      elements.enginePulseDot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      elements.enginePulseDot.className = `inline-block w-2 h-2 rounded-full ${isJingle ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse`;
     }
   } else {
     elements.playPauseBtn.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current text-white" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current ${isJingle ? 'text-zinc-950' : 'text-white'}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>
       </svg>
     `;
     if (elements.engineStatus) {
       elements.engineStatus.textContent = 'Pausado';
-      elements.engineStatus.className = 'text-amber-500 dark:text-amber-400 font-mono font-medium';
+      elements.engineStatus.className = 'text-zinc-500 dark:text-zinc-400 font-mono font-medium';
     }
     if (elements.enginePulseDot) {
-      elements.enginePulseDot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500';
+      elements.enginePulseDot.className = 'inline-block w-2 h-2 rounded-full bg-zinc-400';
     }
     stopVisualizer();
   }
@@ -140,14 +159,21 @@ export function playIndex(index, isCrossfadeTransition = false) {
   
   const isJingle = track.type === 'jingle';
   elements.playingBadge.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
-    isJingle ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+    isJingle ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30'
   }`;
-  elements.playingBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${isJingle ? 'bg-amber-500' : 'bg-blue-500'} animate-ping"></span> ${isJingle ? 'ANUNCIO AL AIRE' : 'EN VIVO'}`;
+  elements.playingBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${isJingle ? 'bg-amber-500' : 'bg-indigo-500'} animate-ping"></span> ${isJingle ? 'ANUNCIO AL AIRE' : 'EN VIVO'}`;
   
   elements.sourceBadge.textContent = track.source === 'youtube' ? 'YouTube Audio' : 'Audio Local (Deck ' + (state.activeDeck === 'A' ? (isCrossfadeTransition ? 'B' : 'A') : (isCrossfadeTransition ? 'A' : 'B')) + ')';
-  elements.playerGlow.className = `absolute -top-16 -left-16 w-48 h-48 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
-    isJingle ? 'bg-amber-500/20' : 'bg-indigo-600/20'
-  }`;
+  
+  // Ambient Dynamic Glow & Card Theme
+  if (elements.playerGlow) {
+    elements.playerGlow.className = `absolute -top-16 -left-16 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-all duration-700 ${
+      isJingle ? 'bg-amber-500/25' : 'bg-indigo-600/20'
+    }`;
+  }
+  if (elements.playerSection) {
+    elements.playerSection.style.borderColor = isJingle ? 'rgba(245, 158, 11, 0.4)' : '';
+  }
 
   // Local Deck Playback
   if (track.source === 'local') {
@@ -262,10 +288,16 @@ window.playIndex = playIndex;
 
 export function startVisualizer() {
   if (visualizerTimer) clearInterval(visualizerTimer);
+  const currentTrack = state.currentIndex >= 0 && state.queue[state.currentIndex] ? state.queue[state.currentIndex] : null;
+  const isJingle = currentTrack && currentTrack.type === 'jingle';
+
   visualizerTimer = setInterval(() => {
     elements.visualizerBars.forEach(bar => {
       const h = Math.floor(Math.random() * 16) + 4;
       bar.style.height = `${h}px`;
+      bar.className = `bar w-1 rounded-full transition-all ${
+        isJingle ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-indigo-500 shadow-sm shadow-indigo-500/50'
+      }`;
     });
   }, 90);
 }
@@ -274,6 +306,7 @@ export function stopVisualizer() {
   if (visualizerTimer) clearInterval(visualizerTimer);
   elements.visualizerBars.forEach(bar => {
     bar.style.height = '4px';
+    bar.className = 'bar w-1 rounded-full bg-zinc-400 dark:bg-zinc-600 transition-all';
   });
 }
 
