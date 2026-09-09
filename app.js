@@ -823,9 +823,14 @@ function fadeInYtHarmonic(player, targetVol, durationSec) {
 
 function setPlayingUI(playing) {
   state.isPlaying = playing;
+  
   if (playing) {
-    elements.playIcon.classList.add('hidden');
-    elements.pauseIcon.classList.remove('hidden');
+    elements.playPauseBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current text-white" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="6" y="4" width="4" height="16"></rect>
+        <rect x="14" y="4" width="4" height="16"></rect>
+      </svg>
+    `;
     if (elements.engineStatus) {
       elements.engineStatus.textContent = 'Transmitiendo';
       elements.engineStatus.className = 'text-emerald-500 dark:text-emerald-400 font-mono font-medium';
@@ -834,8 +839,11 @@ function setPlayingUI(playing) {
       elements.enginePulseDot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
     }
   } else {
-    elements.playIcon.classList.remove('hidden');
-    elements.pauseIcon.classList.add('hidden');
+    elements.playPauseBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current text-white" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+      </svg>
+    `;
     if (elements.engineStatus) {
       elements.engineStatus.textContent = 'Pausado';
       elements.engineStatus.className = 'text-amber-500 dark:text-amber-400 font-mono font-medium';
