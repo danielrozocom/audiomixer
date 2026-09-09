@@ -355,9 +355,12 @@ function renderAllLists() {
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
-        <div class="flex items-center gap-2 pl-2">
+        <div class="flex items-center gap-1.5 pl-2">
           ${isCurrent && state.isPlaying ? '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>' : ''}
-          <button onclick="removeItemFromQueue(${index}, event)" class="text-zinc-400 hover:text-red-500 p-1">
+          <button onclick="duplicateQueueItem(${index}, event)" title="Duplicar en la cola" class="text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 p-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+          <button onclick="removeItemFromQueue(${index}, event)" title="Eliminar de la cola" class="text-zinc-400 hover:text-red-500 p-1">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
           </button>
         </div>
@@ -384,9 +387,14 @@ function renderAllLists() {
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
-        <button onclick="removePoolItem('music', ${index})" class="text-zinc-400 hover:text-red-500 p-1">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
+        <div class="flex items-center gap-1">
+          <button onclick="duplicatePoolItem('music', ${index})" title="Repetir / Duplicar canción" class="text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400 p-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+          <button onclick="removePoolItem('music', ${index})" title="Eliminar canción" class="text-zinc-400 hover:text-red-500 p-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
       `;
       setupDragItem(el, index, 'music');
       elements.musicList.appendChild(el);
@@ -410,9 +418,14 @@ function renderAllLists() {
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
-        <button onclick="removePoolItem('jingle', ${index})" class="text-zinc-400 hover:text-red-500 p-1">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
+        <div class="flex items-center gap-1">
+          <button onclick="duplicatePoolItem('jingle', ${index})" title="Repetir / Duplicar anuncio en la rotación" class="text-zinc-400 hover:text-amber-500 dark:hover:text-amber-400 p-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+          <button onclick="removePoolItem('jingle', ${index})" title="Eliminar anuncio" class="text-zinc-400 hover:text-red-500 p-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
       `;
       setupDragItem(el, index, 'jingles');
       elements.jinglesList.appendChild(el);
@@ -1553,6 +1566,59 @@ elements.shuffleMusicBtn.addEventListener('click', () => {
   showToast("Canciones reordenadas aleatoriamente", "success");
   rebuildQueue();
 });
+
+// Duplicate single item inside queue
+window.duplicateQueueItem = function(index, e) {
+  if (e) e.stopPropagation();
+  if (index < 0 || index >= state.queue.length) return;
+  const original = state.queue[index];
+  const duplicate = {
+    ...original,
+    id: original.source === 'local' ? 'loc_' + Math.random().toString(36).substr(2, 9) : 'yt_' + Math.random().toString(36).substr(2, 9),
+    title: original.title
+  };
+
+  state.queue.splice(index + 1, 0, duplicate);
+  if (state.currentIndex > index) state.currentIndex++;
+  renderAllLists();
+  updateCycleProgress();
+  showToast(`Elemento duplicado en la cola (#${index + 2})`, 'success');
+};
+
+// Duplicate item in Music or Ads Pool
+window.duplicatePoolItem = async function(type, index, e) {
+  if (e) e.stopPropagation();
+  const pool = type === 'music' ? state.musicPool : state.jinglesPool;
+  if (index < 0 || index >= pool.length) return;
+
+  const original = pool[index];
+  const newId = (original.source === 'local' ? 'loc_' : 'yt_') + Math.random().toString(36).substr(2, 9);
+  
+  let newBlob = original.blob || null;
+  let newUrl = original.url;
+
+  if (original.source === 'local') {
+    if (!newBlob && original.id) {
+      const stored = await getAudioBlob(original.id);
+      if (stored && stored.blob) newBlob = stored.blob;
+    }
+    if (newBlob) {
+      newUrl = URL.createObjectURL(newBlob);
+      await saveAudioBlob(newId, newBlob, { title: original.title, type: original.type, duration: original.duration });
+    }
+  }
+
+  const duplicatedItem = {
+    ...original,
+    id: newId,
+    url: newUrl,
+    blob: newBlob,
+  };
+
+  pool.splice(index + 1, 0, duplicatedItem);
+  rebuildQueue();
+  showToast(`¡${type === 'jingle' ? 'Anuncio' : 'Canción'} duplicado con éxito! Se repetirá en la rotación.`, 'success');
+};
 
 // Remove single item from queue
 window.removeItemFromQueue = function(index, e) {
