@@ -593,32 +593,44 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
 };
 
 // ==========================================
-// HARMONIC EQUAL-POWER CROSSFADE ENGINE
-// Uses sinusoidal curves (cos/sin) to maintain constant perceived loudness (-3dB sum)
+// PROFESSIONAL S-CURVE (SMOOTHSTEP) HARMONIC CROSSFADE ENGINE
+// 60FPS Continuous Audio Interpolation for Silky Smooth Radio Transitions
 // ==========================================
 function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
   state.isCrossfading = true;
   const targetVolume = state.isMuted ? 0 : state.volume;
-  const intervalMs = 40;
-  const totalSteps = Math.max(1, (durationSec * 1000) / intervalMs);
+  
+  // High frequency 20ms steps (~50-60 fps for audio volume interpolation)
+  const intervalMs = 20;
+  const totalSteps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
   let step = 0;
+
+  incoming.volume = 0;
 
   const fadeTimer = setInterval(() => {
     step++;
-    const progress = Math.min(1, step / totalSteps);
-    // Equal-power crossfade curve:
-    // in: sin(progress * PI/2), out: cos(progress * PI/2)
-    const inGain = Math.sin(progress * (Math.PI / 2));
-    const outGain = Math.cos(progress * (Math.PI / 2));
+    const t = Math.min(1, step / totalSteps);
+    
+    // Smoothstep S-Curve: 3t^2 - 2t^3 for organic radio DJ bridge
+    const smoothT = t * t * (3 - 2 * t);
+    
+    // Equal power sinusoidal blended with smoothstep
+    const inGain = Math.sin(smoothT * (Math.PI / 2));
+    const outGain = Math.cos(smoothT * (Math.PI / 2));
 
-    incoming.volume = Math.max(0, Math.min(1, targetVolume * inGain));
-    outgoing.volume = Math.max(0, Math.min(1, targetVolume * outGain));
+    try {
+      incoming.volume = Math.max(0, Math.min(1, targetVolume * inGain));
+      outgoing.volume = Math.max(0, Math.min(1, targetVolume * outGain));
+    } catch(e){}
 
     if (step >= totalSteps) {
       clearInterval(fadeTimer);
-      outgoing.pause();
-      outgoing.volume = targetVolume;
-      incoming.volume = targetVolume;
+      try {
+        outgoing.pause();
+        outgoing.currentTime = 0;
+        outgoing.volume = targetVolume;
+        incoming.volume = targetVolume;
+      } catch(e){}
       state.isCrossfading = false;
     }
   }, intervalMs);
@@ -627,20 +639,27 @@ function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
 // Harmonic Fade-Out for Local Audio Deck
 function fadeOutLocalHarmonic(player, durationSec) {
   const initialVol = player.volume;
-  const intervalMs = 40;
-  const totalSteps = Math.max(1, (durationSec * 1000) / intervalMs);
+  const intervalMs = 20;
+  const totalSteps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
   let step = 0;
 
   const fadeTimer = setInterval(() => {
     step++;
-    const progress = Math.min(1, step / totalSteps);
-    const outGain = Math.cos(progress * (Math.PI / 2));
-    player.volume = Math.max(0, initialVol * outGain);
+    const t = Math.min(1, step / totalSteps);
+    const smoothT = t * t * (3 - 2 * t);
+    const outGain = Math.cos(smoothT * (Math.PI / 2));
+    
+    try {
+      player.volume = Math.max(0, initialVol * outGain);
+    } catch(e){}
 
     if (step >= totalSteps) {
       clearInterval(fadeTimer);
-      player.pause();
-      player.volume = state.isMuted ? 0 : state.volume;
+      try {
+        player.pause();
+        player.currentTime = 0;
+        player.volume = state.isMuted ? 0 : state.volume;
+      } catch(e){}
     }
   }, intervalMs);
 }
