@@ -130,22 +130,34 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
 
       let isResolved = false;
       let checkInterval = null;
+      let safetyTimer = null;
 
       const finishChime = () => {
         if (isResolved) return;
         isResolved = true;
         if (checkInterval) clearInterval(checkInterval);
+        if (safetyTimer) clearTimeout(safetyTimer);
         resolve();
       };
 
-      // Safety timeout: video is ~2-3 seconds long
-      const safetyTimer = setTimeout(() => {
-        finishChime();
-      }, 4500);
-
       const onEnded = () => {
-        clearTimeout(safetyTimer);
         finishChime();
+      };
+
+      const startMonitoring = () => {
+        if (checkInterval) clearInterval(checkInterval);
+        checkInterval = setInterval(() => {
+          if (ytChimePlayer && ytChimePlayer.getCurrentTime && ytChimePlayer.getDuration) {
+            try {
+              const cur = ytChimePlayer.getCurrentTime() || 0;
+              const dur = ytChimePlayer.getDuration() || 0;
+              // If video actually reached the end
+              if (dur > 0 && cur >= dur - 0.15) {
+                onEnded();
+              }
+            } catch(e){}
+          }
+        }, 150);
       };
 
       if (!ytChimePlayer || !ytChimePlayer.loadVideoById) {
@@ -166,15 +178,24 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
             onReady: (event) => {
               event.target.setVolume(state.isMuted ? 0 : 100);
               event.target.playVideo();
+              startMonitoring();
             },
             onStateChange: (event) => {
-              if (event.data === YT.PlayerState.ENDED) {
+              if (event.data === YT.PlayerState.PLAYING) {
+                const dur = event.target.getDuration() || 6;
+                // Dynamically set safety timeout according to actual video length
+                if (safetyTimer) clearTimeout(safetyTimer);
+                safetyTimer = setTimeout(() => {
+                  finishChime();
+                }, (dur + 1.5) * 1000);
+                startMonitoring();
+              } else if (event.data === YT.PlayerState.ENDED) {
                 onEnded();
               }
             },
             onError: () => {
-              clearTimeout(safetyTimer);
-              playRadioChime(state.volume, true).then(resolve);
+              finishChime();
+              playRadioChime(state.volume, true);
             }
           }
         });
@@ -182,20 +203,8 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
         ytChimePlayer.setVolume(state.isMuted ? 0 : 100);
         ytChimePlayer.loadVideoById(videoId);
         ytChimePlayer.playVideo();
+        startMonitoring();
       }
-
-      // Check current time / duration as backup to onEnded
-      checkInterval = setInterval(() => {
-        if (ytChimePlayer && ytChimePlayer.getCurrentTime && ytChimePlayer.getDuration) {
-          try {
-            const cur = ytChimePlayer.getCurrentTime() || 0;
-            const dur = ytChimePlayer.getDuration() || 0;
-            if (dur > 0 && cur >= dur - 0.2) {
-              onEnded();
-            }
-          } catch(e){}
-        }
-      }, 250);
 
     } catch (e) {
       console.warn("YouTube chime playback error:", e);
