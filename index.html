@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AudioMix Pro - Automatización y Emisión de Audio Profesional</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            // Dark Mode Shadcn Palette
+            dark: {
+              bg: '#09090b',
+              card: '#121215',
+              'card-hover': '#18181b',
+              border: '#27272a',
+              subtle: '#1f1f23',
+              text: '#fafafa',
+              muted: '#a1a1aa'
+            },
+            // Light Mode Shadcn Palette
+            light: {
+              bg: '#f8fafc',
+              card: '#ffffff',
+              'card-hover': '#f1f5f9',
+              border: '#e2e8f0',
+              subtle: '#cbd5e1',
+              text: '#0f172a',
+              muted: '#64748b'
+            },
+            accent: '#6366f1',
+            'accent-hover': '#4f46e5',
+            jingle: '#f59e0b',
+            music: '#3b82f6',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-zinc-100 text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100 font-sans min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-indigo-600 dark:selection:text-indigo-200 transition-colors duration-200">
+
+  <!-- Main Top Bar -->
+  <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white/85 dark:bg-[#121215]/85 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between transition-colors">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-400/30">
+        <i data-lucide="radio-tower" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">AudioMix <span class="text-indigo-500 font-mono text-sm">PRO</span></h1>
+          <span class="text-[10px] font-mono uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded-full font-medium">Auto-DJ + Crossfade</span>
+        </div>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400">Automatización inteligente de música y anuncios publicitarios</p>
+      </div>
+    </div>
+
+    <!-- Theme & Status Bar Controls -->
+    <div class="flex items-center gap-3">
+      
+      <!-- Theme Selector Dropdown (Oscuro, Claro, Sistema) -->
+      <div class="flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-dark-border rounded-lg p-0.5 text-xs">
+        <button id="themeLightBtn" title="Modo Claro" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 transition">
+          <i data-lucide="sun" class="w-3.5 h-3.5"></i>
+        </button>
+        <button id="themeDarkBtn" title="Modo Oscuro" class="p-1.5 rounded-md bg-zinc-800 text-zinc-100 shadow-sm transition">
+          <i data-lucide="moon" class="w-3.5 h-3.5"></i>
+        </button>
+        <button id="themeSystemBtn" title="Tema del Sistema" class="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition">
+          <i data-lucide="laptop" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- Export & Import JSON Configuration Buttons -->
+      <div class="flex items-center gap-1.5">
+        <input type="file" id="importJsonInput" accept=".json,application/json" class="hidden">
+        <button id="importJsonBtn" title="Importar configuración y listas desde archivo JSON" class="text-xs text-zinc-600 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 border border-zinc-200 dark:border-zinc-800 hover:border-indigo-500/40 bg-zinc-50 dark:bg-zinc-900/60 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5">
+          <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
+          <span class="hidden lg:inline">Importar JSON</span>
+        </button>
+        <button id="exportJsonBtn" title="Exportar configuración, listas y rotación a archivo JSON" class="text-xs text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/40 bg-zinc-50 dark:bg-zinc-900/60 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5">
+          <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+          <span class="hidden lg:inline">Exportar JSON</span>
+        </button>
+      </div>
+
+      <button id="clearAllBtn" title="Vaciar todas las listas" class="text-xs text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 border border-zinc-200 dark:border-zinc-800 hover:border-red-400/40 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        <span class="hidden md:inline">Limpiar Todo</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <div class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    
+    <!-- Left Column: Source Loaders & Automation Engine Settings (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Automation & Crossfade Config Card -->
+      <section class="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl p-5 shadow-sm relative overflow-hidden transition-colors">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <div class="p-1.5 rounded-md bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Motor de Rotación & Mezcla</h2>
+          </div>
+          <span class="text-xs text-zinc-500 dark:text-zinc-400 font-mono" id="ratioSummary">Ratio: 2:1</span>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Ratio Slider -->
+          <div class="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-dark-border rounded-lg p-3.5">
+            <div class="flex justify-between items-center mb-2">
+              <label for="rotationRatio" class="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <i data-lucide="music" class="w-3.5 h-3.5 text-blue-500"></i> Canciones por cada anuncio:
+              </label>
+              <span id="rotationValueDisplay" class="text-xs font-mono font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded">2 canciones</span>
+            </div>
+            <input type="range" id="rotationRatio" min="1" max="10" value="2" class="w-full">
+            <div class="flex justify-between text-[10px] text-zinc-400 font-mono mt-1">
+              <span>1 Canción</span>
+              <span>5 Canciones</span>
+              <span>10 Canciones</span>
+            </div>
+          </div>
+
+          <!-- Professional Crossfade Slider -->
+          <div class="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-dark-border rounded-lg p-3.5">
+            <div class="flex justify-between items-center mb-2">
+              <label for="crossfadeSlider" class="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <i data-lucide="git-merge" class="w-3.5 h-3.5 text-indigo-500"></i> Crossfade Profesional (Empalme):
+              </label>
+              <span id="crossfadeValueDisplay" class="text-xs font-mono font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded">3.0 seg</span>
+            </div>
+            <input type="range" id="crossfadeSlider" min="0" max="10" step="0.5" value="3.0" class="w-full">
+            <div class="flex justify-between text-[10px] text-zinc-400 font-mono mt-1">
+              <span>0s (Corte limpio)</span>
+              <span>5s (Estándar Radio)</span>
+              <span>10s (Club/DJ)</span>
+            </div>
+          </div>
+
+          <!-- Automation Progress Indicator -->
+          <div class="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-dark-border rounded-lg p-3.5">
+            <div class="flex justify-between text-xs mb-2">
+              <span class="text-zinc-600 dark:text-zinc-400">Ciclo de rotación actual:</span>
+              <span id="cycleCounter" class="font-mono text-indigo-600 dark:text-indigo-400 font-semibold">0 / 2 pistas</span>
+            </div>
+            <div class="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden flex">
+              <div id="cycleProgressBar" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="nextScheduledTag" class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-2 flex items-center gap-1">
+              <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5 text-zinc-400"></i> Próximo tipo en turno: <span class="text-blue-500 font-medium">Música</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sources Upload & Import Card -->
+      <section class="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl p-5 shadow-sm space-y-5 transition-colors">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-dark-border">
+            <i data-lucide="folder-input" class="w-4 h-4"></i>
+          </div>
+          <h2 class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Cargar Fuentes de Audio</h2>
+        </div>
+
+        <!-- Local Music Uploader -->
+        <div class="space-y-2">
+          <label class="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-blue-500"></span> Música Local (Archivos)
+            </span>
+            <span id="musicFileCount" class="text-[11px] font-mono text-zinc-400">0 archivos</span>
+          </label>
+          <label class="flex flex-col items-center justify-center border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-indigo-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-lg p-3.5 cursor-pointer transition group">
+            <input type="file" id="musicFileInput" multiple accept="audio/*" class="hidden">
+            <div class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 group-hover:text-indigo-600 dark:group-hover:text-zinc-200">
+              <i data-lucide="upload" class="w-4 h-4 text-zinc-400 group-hover:text-indigo-500"></i>
+              <span>Seleccionar o arrastrar canciones</span>
+            </div>
+            <span class="text-[10px] text-zinc-400 mt-0.5">MP3, WAV, OGG, AAC, FLAC</span>
+          </label>
+        </div>
+
+        <!-- Local Commercials/Ads Uploader -->
+        <div class="space-y-2">
+          <label class="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span> Anuncios / Publicidad / Spots
+            </span>
+            <span id="jinglesFileCount" class="text-[11px] font-mono text-zinc-400">0 archivos</span>
+          </label>
+          <label class="flex flex-col items-center justify-center border border-dashed border-amber-300 dark:border-amber-900/40 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-amber-950/10 rounded-lg p-3.5 cursor-pointer transition group">
+            <input type="file" id="jinglesFileInput" multiple accept="audio/*" class="hidden">
+            <div class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 group-hover:text-amber-600 dark:group-hover:text-zinc-200">
+              <i data-lucide="megaphone" class="w-4 h-4 text-amber-500 group-hover:text-amber-600"></i>
+              <span>Seleccionar o arrastrar anuncios/publicidad</span>
+            </div>
+            <span class="text-[10px] text-zinc-400 mt-0.5">Spots comerciales, cuñas, anuncios de radio</span>
+          </label>
+        </div>
+
+        <!-- YouTube Stream & Playlist Importer -->
+        <div class="space-y-2.5 pt-2 border-t border-zinc-200 dark:border-dark-border">
+          <label class="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="video" class="w-4 h-4 text-red-500"></i> YouTube (Playlists & Videos)
+            </span>
+            <span class="text-[10px] text-indigo-500 font-mono">Extractor Auto</span>
+          </label>
+
+          <div class="space-y-2">
+            <div class="flex gap-2">
+              <input type="text" id="ytUrlInput" placeholder="URL de playlist (list=PL...), video o IDs separados por coma" 
+                class="w-full bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-dark-border focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 outline-none transition font-mono">
+              <select id="ytCategorySelect" class="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-dark-border rounded-lg px-2.5 py-2 text-xs text-zinc-700 dark:text-zinc-300 outline-none">
+                <option value="music">Música</option>
+                <option value="jingle">Anuncio</option>
+              </select>
+            </div>
+            <p class="text-[10px] text-zinc-400">
+              💡 Soporta enlaces completos de Playlist, canales, videos sueltos o varios enlaces.
+            </p>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="importYtBtn" class="flex-1 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 text-xs py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5">
+              <i data-lucide="list-plus" class="w-3.5 h-3.5"></i>
+              <span id="importYtBtnText">Importar Playlist / Video</span>
+            </button>
+            <button id="loadDemoBtn" title="Cargar pistas de prueba predeterminadas" class="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-dark-border text-xs py-2 px-3 rounded-lg font-medium transition flex items-center gap-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>Demo</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Right Column: Player Dashboard & Live Queue Manager (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- NOW PLAYING CARD -->
+      <section class="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl p-5 sm:p-6 shadow-md relative overflow-hidden transition-colors">
+        <!-- Ambient glow depending on type -->
+        <div id="playerGlow" class="absolute -top-16 -left-16 w-48 h-48 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none transition-colors duration-500"></div>
+
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <span id="playingBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+              <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span> DETENIDO
+            </span>
+            <span id="sourceBadge" class="text-[11px] font-mono text-zinc-400">Sin fuente</span>
+          </div>
+
+          <!-- Audio Equalizer Bars Visualizer -->
+          <div id="visualizerContainer" class="flex items-end gap-1 h-5 px-2">
+            <span class="bar w-1 bg-indigo-500 rounded-full h-1"></span>
+            <span class="bar w-1 bg-indigo-400 rounded-full h-1"></span>
+            <span class="bar w-1 bg-indigo-500 rounded-full h-1"></span>
+            <span class="bar w-1 bg-indigo-300 rounded-full h-1"></span>
+            <span class="bar w-1 bg-indigo-500 rounded-full h-1"></span>
+          </div>
+        </div>
+
+        <!-- Track Title & Metadata Display -->
+        <div class="my-4">
+          <h3 id="currentTrackTitle" class="text-lg sm:text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 truncate">
+            No hay pista en reproducción
+          </h3>
+          <p id="currentTrackArtist" class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 truncate">
+            Carga canciones y anuncios en el panel izquierdo o pulsa 'Demo'
+          </p>
+        </div>
+
+        <!-- Progress Bar & Timers -->
+        <div class="space-y-1.5 my-5">
+          <div class="relative w-full">
+            <input type="range" id="trackProgress" min="0" max="100" value="0" step="0.1" class="w-full">
+          </div>
+          <div class="flex justify-between text-xs font-mono text-zinc-500 dark:text-zinc-400">
+            <span id="currentTime">00:00</span>
+            <span id="totalDuration">00:00</span>
+          </div>
+        </div>
+
+        <!-- Controls: Play, Pause, Prev, Next, Volume -->
+        <div class="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-zinc-200 dark:border-dark-border">
+          
+          <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Prev Button -->
+            <button id="prevBtn" class="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-dark-border hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition active:scale-95">
+              <i data-lucide="skip-back" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Play/Pause Main Button -->
+            <button id="playPauseBtn" class="p-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition transform active:scale-95 flex items-center justify-center">
+              <i data-lucide="play" id="playIcon" class="w-5 h-5 fill-current"></i>
+              <i data-lucide="pause" id="pauseIcon" class="w-5 h-5 fill-current hidden"></i>
+            </button>
+
+            <!-- Next Button -->
+            <button id="nextBtn" class="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-dark-border hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition active:scale-95">
+              <i data-lucide="skip-forward" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Autoplay Toggle -->
+            <button id="autoPlayToggle" class="ml-2 text-xs px-2.5 py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center gap-1.5 transition">
+              <i data-lucide="infinity" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Auto-DJ Activo</span>
+            </button>
+          </div>
+
+          <!-- Volume Controls -->
+          <div class="flex items-center gap-2 min-w-[130px]">
+            <button id="muteBtn" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200">
+              <i data-lucide="volume-2" id="volumeIcon" class="w-4 h-4"></i>
+            </button>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" class="w-24">
+            <span id="volumePercent" class="text-[10px] font-mono text-zinc-400 w-7 text-right">80%</span>
+          </div>
+
+        </div>
+
+        <!-- Hidden YouTube Player Container -->
+        <div id="youtubePlayerWrapper" class="mt-4 rounded-lg overflow-hidden border border-zinc-200 dark:border-dark-border bg-black aspect-video max-h-48 hidden">
+          <div id="ytIframe"></div>
+        </div>
+      </section>
+
+      <!-- TABS & PLAYLIST MANAGER WITH DRAG AND DROP -->
+      <section class="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl p-5 shadow-sm flex flex-col flex-1 transition-colors">
+        
+        <!-- Tab Headers -->
+        <div class="flex items-center justify-between border-b border-zinc-200 dark:border-dark-border pb-3 mb-4">
+          <div class="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg border border-zinc-200 dark:border-dark-border text-xs">
+            <button id="tabQueue" class="px-3 py-1.5 rounded-md font-medium bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm transition">
+              Cola Activa (<span id="totalQueueBadge">0</span>)
+            </button>
+            <button id="tabMusic" class="px-3 py-1.5 rounded-md font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition">
+              Música (<span id="totalMusicBadge">0</span>)
+            </button>
+            <button id="tabJingles" class="px-3 py-1.5 rounded-md font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition">
+              Anuncios (<span id="totalJinglesBadge">0</span>)
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="hidden md:inline-flex text-[11px] text-zinc-400 items-center gap-1 font-mono">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> Arrastra para reordenar
+            </span>
+            <button id="shuffleMusicBtn" title="Mezclar canciones" class="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md border border-zinc-200 dark:border-dark-border text-xs flex items-center gap-1">
+              <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Aleatorio</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Dynamic Interleaved Queue (Drag & Drop Enabled) -->
+        <div id="viewQueue" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+          <div id="queueEmptyState" class="py-12 text-center text-zinc-400">
+            <i data-lucide="list-music" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+            <p class="text-sm">La cola está vacía.</p>
+            <p class="text-xs mt-1 text-zinc-400">Añade música y anuncios para que el motor arme la rotación o arrastra pistas entre sí.</p>
+          </div>
+          <div id="queueList" class="space-y-1.5"></div>
+        </div>
+
+        <!-- Tab 2: Music Pool List (Drag & Drop Enabled) -->
+        <div id="viewMusic" class="space-y-2 max-h-[380px] overflow-y-auto pr-1 hidden">
+          <div id="musicEmptyState" class="py-12 text-center text-zinc-400">
+            <i data-lucide="music-2" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+            <p class="text-sm">No hay temas musicales cargados.</p>
+          </div>
+          <div id="musicList" class="space-y-1.5"></div>
+        </div>
+
+        <!-- Tab 3: Ads Pool List (Drag & Drop Enabled) -->
+        <div id="viewJingles" class="space-y-2 max-h-[380px] overflow-y-auto pr-1 hidden">
+          <div id="jinglesEmptyState" class="py-12 text-center text-zinc-400">
+            <i data-lucide="megaphone" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+            <p class="text-sm">No hay anuncios publicitarios cargados.</p>
+          </div>
+          <div id="jinglesList" class="space-y-1.5"></div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Dual Audio Engine Players for Smooth Crossfading -->
+  <audio id="audioEngineA" preload="auto"></audio>
+  <audio id="audioEngineB" preload="auto"></audio>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
