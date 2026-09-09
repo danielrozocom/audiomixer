@@ -67,6 +67,7 @@ input[type=range]:hover::-webkit-slider-thumb {
   cursor: grab;
   user-select: none;
   transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+  position: relative;
 }
 .drag-item:active {
   cursor: grabbing;
@@ -75,8 +76,11 @@ input[type=range]:hover::-webkit-slider-thumb {
   opacity: 0.4;
   transform: scale(0.98);
 }
-.drag-item.drag-over {
-  border-top: 2px solid #6366f1 !important;
+.drag-item.drag-over-top {
+  border-top: 2.5px solid #6366f1 !important;
+}
+.drag-item.drag-over-bottom {
+  border-bottom: 2.5px solid #6366f1 !important;
 }
 
 /* Visualizer Animation */

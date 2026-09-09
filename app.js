@@ -234,31 +234,57 @@ function setupDragItem(el, index, listType) {
 
   el.addEventListener('dragend', () => {
     el.classList.remove('dragging');
-    document.querySelectorAll('.drag-over').forEach(item => item.classList.remove('drag-over'));
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(item => {
+      item.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
   });
 
   el.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    el.classList.add('drag-over');
+
+    const rect = el.getBoundingClientRect();
+    const midPoint = rect.top + rect.height / 2;
+    
+    if (e.clientY < midPoint) {
+      el.classList.add('drag-over-top');
+      el.classList.remove('drag-over-bottom');
+    } else {
+      el.classList.add('drag-over-bottom');
+      el.classList.remove('drag-over-top');
+    }
   });
 
   el.addEventListener('dragleave', () => {
-    el.classList.remove('drag-over');
+    el.classList.remove('drag-over-top', 'drag-over-bottom');
   });
 
   el.addEventListener('drop', (e) => {
     e.preventDefault();
-    el.classList.remove('drag-over');
-    const fromIndex = state.draggedItemIndex;
-    const toIndex = index;
+    const rect = el.getBoundingClientRect();
+    const midPoint = rect.top + rect.height / 2;
+    const isBelow = e.clientY >= midPoint;
 
-    if (fromIndex === null || fromIndex === toIndex) return;
+    el.classList.remove('drag-over-top', 'drag-over-bottom');
+    const fromIndex = state.draggedItemIndex;
+    let toIndex = index;
+
+    if (fromIndex === null) return;
+
+    // Calculate final insertion index taking above/below into account
+    if (isBelow && fromIndex > index) {
+      toIndex = index + 1;
+    } else if (!isBelow && fromIndex < index) {
+      toIndex = Math.max(0, index - 1);
+    }
+
+    if (fromIndex === toIndex) return;
 
     if (listType === 'queue' && state.draggedItemType === 'queue') {
       const [movedItem] = state.queue.splice(fromIndex, 1);
       state.queue.splice(toIndex, 0, movedItem);
       
+      // Update currently playing item reference
       if (state.currentIndex === fromIndex) {
         state.currentIndex = toIndex;
       } else if (fromIndex < state.currentIndex && toIndex >= state.currentIndex) {
@@ -267,7 +293,7 @@ function setupDragItem(el, index, listType) {
         state.currentIndex++;
       }
       renderAllLists();
-      showToast(`Pista reubicada a la posición #${toIndex + 1}`, 'info');
+      showToast(`Pista movida a la posición #${toIndex + 1}`, 'info');
 
     } else if (listType === 'music' && state.draggedItemType === 'music') {
       const [movedItem] = state.musicPool.splice(fromIndex, 1);
