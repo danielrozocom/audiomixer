@@ -1397,46 +1397,53 @@ function parseYouTubeInput(rawText) {
 }
 
 async function fetchPlaylistItems(playlistId) {
+  // Comprehensive active Piped and Invidious public instance list
   const endpoints = [
     `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
     `https://api.piped.privacydev.net/playlists/${playlistId}`,
+    `https://piped-api.lunar.icu/playlists/${playlistId}`,
+    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
     `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
     `https://inv.tux.pizza/api/v1/playlists/${playlistId}`,
-    `https://invidious.privacydev.net/api/v1/playlists/${playlistId}`
+    `https://invidious.privacydev.net/api/v1/playlists/${playlistId}`,
+    `https://invidious.flokinet.to/api/v1/playlists/${playlistId}`,
+    `https://vid.puffyan.us/api/v1/playlists/${playlistId}`
   ];
 
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
-        // Piped format
+        // Piped response format
         if (data && Array.isArray(data.relatedStreams) && data.relatedStreams.length > 0) {
-          return data.relatedStreams.map(v => {
-            const vId = v.url ? v.url.replace('/watch?v=', '') : v.id;
+          const mapped = data.relatedStreams.map(v => {
+            let vId = v.url ? v.url.replace('/watch?v=', '').split('&')[0] : v.id;
             return {
               id: vId,
               title: v.title || `YouTube Audio [${vId}]`,
               duration: v.duration || null
             };
           }).filter(v => v.id && v.id.length === 11);
+          if (mapped.length > 0) return mapped;
         }
-        // Invidious format
+        // Invidious response format
         if (data && Array.isArray(data.videos) && data.videos.length > 0) {
-          return data.videos.map(v => ({
+          const mapped = data.videos.map(v => ({
             id: v.videoId,
             title: v.title || `YouTube Audio [${v.videoId}]`,
             duration: v.lengthSeconds || null
           })).filter(v => v.id && v.id.length === 11);
+          if (mapped.length > 0) return mapped;
         }
       }
     } catch(e) {}
   }
 
-  // Fallback: Embed as direct YouTube Playlist Player container
+  // Direct Playlist Container fallback: plays full continuous YouTube playlist inside player
   let playlistTitle = `Playlist de YouTube [${playlistId.substring(0, 14)}...]`;
   try {
     const oEmbedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/playlist?list=${playlistId}`);
