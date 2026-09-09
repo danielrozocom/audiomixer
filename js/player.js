@@ -148,12 +148,56 @@ export async function handleTrackEnd() {
   // Chime triggers strictly before ads/commercials
   if (isJingleNext) {
     state.isCrossfading = true;
+    
+    // UI: Cortinilla Theme & Data
     elements.currentTrackTitle.textContent = "Cortinilla Radial...";
     elements.currentTrackArtist.textContent = `Próximo: ${nextTrack.title}`;
     elements.playingBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30';
     elements.playingBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> CORTINILLA';
+    elements.sourceBadge.textContent = 'Cortinilla Automática';
+    
+    // Reset timers during cortinilla transition
+    elements.currentTime.textContent = "00:00";
+    elements.totalDuration.textContent = "--:--";
+    elements.trackProgress.value = 0;
+    
+    // Ambient and Theme styling to amber/yellow
+    if (elements.playerGlow) {
+      elements.playerGlow.className = 'absolute -top-16 -left-16 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-all duration-700 bg-amber-500/25';
+    }
+    if (elements.playerSection) {
+      elements.playerSection.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    }
+    if (elements.dynamicModePill) {
+      elements.dynamicModePill.className = 'text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center gap-1.5 transition-colors';
+      elements.dynamicModeDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      elements.dynamicModeText.textContent = 'Modo Cortinilla';
+    }
+
+    // Play/Pause button and controls in amber state and disabled during cortinilla
+    elements.playPauseBtn.className = 'p-3.5 rounded-xl bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/30 transition-all transform opacity-80 cursor-wait flex items-center justify-center';
+    elements.playPauseBtn.disabled = true;
+    elements.prevBtn.disabled = true;
+    elements.nextBtn.disabled = true;
+    elements.trackProgress.disabled = true;
+    elements.prevBtn.classList.add('opacity-40', 'cursor-not-allowed');
+    elements.nextBtn.classList.add('opacity-40', 'cursor-not-allowed');
+    elements.trackProgress.classList.add('opacity-40', 'cursor-not-allowed');
+
+    startVisualizer();
     
     await triggerTransitionBridge(true);
+    
+    // Re-enable controls for the incoming track
+    elements.playPauseBtn.disabled = false;
+    elements.prevBtn.disabled = false;
+    elements.nextBtn.disabled = false;
+    elements.trackProgress.disabled = false;
+    elements.prevBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+    elements.nextBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+    elements.trackProgress.classList.remove('opacity-40', 'cursor-not-allowed');
+    elements.playPauseBtn.classList.remove('cursor-wait', 'opacity-80');
+
     state.isCrossfading = false;
   }
   playIndex(nextIdx, false);
