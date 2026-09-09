@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>AudioMix Pro - Automatización y Emisión de Audio Profesional</title>
+
+  <!-- Prevent Theme Flash (FOUC) -->
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem('audiomix_theme') || 'dark';
+        if (saved === 'dark' || (saved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
   
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

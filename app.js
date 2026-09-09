@@ -771,46 +771,6 @@ async function executeHarmonicCrossfade(outgoing, incoming, durationSec, isJingl
   }, intervalMs);
 }
 
-  if (state.transitionMode === 'cut') {
-    outgoing.pause();
-    outgoing.currentTime = 0;
-    incoming.volume = targetVolume;
-    state.isCrossfading = false;
-    return;
-  }
-
-  // Otherwise crossfade mode
-  const intervalMs = 20;
-  const totalSteps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
-  let step = 0;
-
-  incoming.volume = 0;
-
-  const fadeTimer = setInterval(() => {
-    step++;
-    const t = Math.min(1, step / totalSteps);
-    const smoothT = t * t * (3 - 2 * t);
-    const inGain = Math.sin(smoothT * (Math.PI / 2));
-    const outGain = Math.cos(smoothT * (Math.PI / 2));
-
-    try {
-      incoming.volume = Math.max(0, Math.min(1, targetVolume * inGain));
-      outgoing.volume = Math.max(0, Math.min(1, targetVolume * outGain));
-    } catch(e){}
-
-    if (step >= totalSteps) {
-      clearInterval(fadeTimer);
-      try {
-        outgoing.pause();
-        outgoing.currentTime = 0;
-        outgoing.volume = targetVolume;
-        incoming.volume = targetVolume;
-      } catch(e){}
-      state.isCrossfading = false;
-    }
-  }, intervalMs);
-}
-
 // Harmonic Fade-Out for Local Audio Deck
 function fadeOutLocalHarmonic(player, durationSec) {
   const initialVol = player.volume;
