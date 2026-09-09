@@ -1566,12 +1566,15 @@ async function importConfigFromJson(file) {
       const adsArray = imported.adsPool || imported.jinglesPool;
       const newAds = await processItems(adsArray, 'jingle');
 
-      state.musicPool = [...state.musicPool, ...newMusic];
-      state.jinglesPool = [...state.jinglesPool, ...newAds];
+      // Set pools cleanly with imported data (preventing duplicates)
+      state.musicPool = newMusic;
+      state.jinglesPool = newAds;
 
+      // Rebuild queue from fresh imported pools
+      state.currentIndex = -1;
       rebuildQueue();
       
-      showToast(`¡JSON importado con éxito! (${newMusic.length + newAds.length} elementos agregados)`, "success");
+      showToast(`¡JSON importado con éxito! (${newMusic.length} música, ${newAds.length} anuncios)`, "success");
 
     } catch(err) {
       console.error("JSON Import error:", err);
