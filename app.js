@@ -562,7 +562,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setPlayingUI(false);
               } else if (event.data === YT.PlayerState.ENDED) {
-                if (state.autoDj) playNext(false);
+                handleTrackEnd();
               }
             },
             onError: (err) => {
@@ -665,17 +665,25 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
       const now = ctx.currentTime;
 
       if (isJingleNext) {
-        // Unmistakable Radio Commercial Signature (Ascending double arpeggio alert chime)
+        // Broadcaster Commercial Identification Chime (Repeating 3-burst airport/radio style fanfare)
+        // Burst 1: C6 (1046.5Hz) -> E6 (1318.5Hz) -> G6 (1567.98Hz)
+        // Burst 2: E6 (1318.5Hz) -> G6 (1567.98Hz) -> C7 (2093.00Hz)
+        // Burst 3: Final sustained High C7 (2093.00Hz) bell
         const sequence = [
-          { freq: 1046.50, time: now + 0.00 }, // C6
-          { freq: 1318.51, time: now + 0.12 }, // E6
-          { freq: 1567.98, time: now + 0.24 }, // G6
-          { freq: 1318.51, time: now + 0.48 }, // E6
-          { freq: 1567.98, time: now + 0.60 }, // G6
-          { freq: 2093.00, time: now + 0.72 }, // C7
+          // Arpegio 1
+          { freq: 1046.50, time: now + 0.00, dur: 0.7, vol: 0.85 },
+          { freq: 1318.51, time: now + 0.14, dur: 0.7, vol: 0.85 },
+          { freq: 1567.98, time: now + 0.28, dur: 0.8, vol: 0.90 },
+          // Pausa corta y Arpegio 2 más agudo
+          { freq: 1318.51, time: now + 0.55, dur: 0.7, vol: 0.90 },
+          { freq: 1567.98, time: now + 0.69, dur: 0.7, vol: 0.95 },
+          { freq: 2093.00, time: now + 0.83, dur: 1.1, vol: 1.00 },
+          // Campanada final de confirmación
+          { freq: 2093.00, time: now + 1.20, dur: 1.2, vol: 0.95 }
         ];
 
         sequence.forEach(item => {
+          // Fundamental sine wave
           const osc = ctx.createOscillator();
           const noteGain = ctx.createGain();
 
@@ -683,40 +691,34 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
           osc.frequency.setValueAtTime(item.freq, item.time);
 
           noteGain.gain.setValueAtTime(0.0001, item.time);
-          noteGain.gain.exponentialRampToValueAtTime(0.85, item.time + 0.02);
-          noteGain.gain.exponentialRampToValueAtTime(0.0001, item.time + 0.9);
+          noteGain.gain.exponentialRampToValueAtTime(item.vol, item.time + 0.02);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, item.time + item.dur);
 
           osc.connect(noteGain);
           noteGain.connect(masterGain);
 
           osc.start(item.time);
-          osc.stop(item.time + 0.95);
+          osc.stop(item.time + item.dur + 0.05);
+
+          // Harmonic overtone for realistic metal bell shimmer
+          const harmOsc = ctx.createOscillator();
+          const harmGain = ctx.createGain();
+          harmOsc.type = 'sine';
+          harmOsc.frequency.setValueAtTime(item.freq * 2.76, item.time);
+          harmGain.gain.setValueAtTime(0.0001, item.time);
+          harmGain.gain.exponentialRampToValueAtTime(item.vol * 0.25, item.time + 0.015);
+          harmGain.gain.exponentialRampToValueAtTime(0.0001, item.time + (item.dur * 0.5));
+          harmOsc.connect(harmGain);
+          harmGain.connect(masterGain);
+          harmOsc.start(item.time);
+          harmOsc.stop(item.time + (item.dur * 0.5) + 0.05);
         });
 
-        setTimeout(resolve, 1100);
+        setTimeout(resolve, 1850);
 
       } else {
-        // Crisp 3-bell sweep for regular song transitions
-        const notes = [1046.50, 1318.51, 1567.98];
-        notes.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const noteGain = ctx.createGain();
-
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-
-          noteGain.gain.setValueAtTime(0.0001, now + idx * 0.12);
-          noteGain.gain.exponentialRampToValueAtTime(0.75, now + idx * 0.12 + 0.02);
-          noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
-
-          osc.connect(noteGain);
-          noteGain.connect(masterGain);
-
-          osc.start(now + idx * 0.12);
-          osc.stop(now + idx * 0.12 + 0.95);
-        });
-
-        setTimeout(resolve, 800);
+        // Regular song-to-song transition: Silent or clean instantaneous handover
+        resolve();
       }
     } catch(e) {
       console.warn("Chime execution error", e);
