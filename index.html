@@ -370,20 +370,19 @@
               <i data-lucide="skip-forward" class="w-4 h-4"></i>
             </button>
 
-            <!-- Autoplay Toggle -->
+            <!-- Autoplay / Loop Toggle (Auto-DJ continuo en bucle) -->
             <button id="autoPlayToggle" class="ml-2 text-xs px-2.5 py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center gap-1.5 transition">
-              <i data-lucide="infinity" class="w-3.5 h-3.5"></i>
-              <span class="hidden sm:inline">Auto-DJ Activo</span>
+              <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Bucle Continuo Activo</span>
             </button>
           </div>
 
-          <!-- Volume Controls -->
-          <div class="flex items-center gap-2 min-w-[130px]">
-            <button id="muteBtn" class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200">
-              <i data-lucide="volume-2" id="volumeIcon" class="w-4 h-4"></i>
-            </button>
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" class="w-24">
-            <span id="volumePercent" class="text-[10px] font-mono text-zinc-400 w-7 text-right">80%</span>
+          <!-- Broadcast Master Output Status Badge (Full 100% Volume) -->
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+              <span>Salida Master: 100%</span>
+            </span>
           </div>
 
         </div>

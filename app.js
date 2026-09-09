@@ -11,7 +11,7 @@ const state = {
   crossfadeDuration: 2.0, // Seconds of overlap crossfade
   isCrossfading: false,
   autoDj: true,
-  volume: 0.8,
+  volume: 1.0, // Full 100% Master Volume always
   isMuted: false,
   activeTab: 'queue',
   theme: 'dark',      // 'dark', 'light', or 'system'
@@ -1052,38 +1052,39 @@ elements.trackProgress.addEventListener('input', (e) => {
   }
 });
 
-// Volume Slider & Mute
-function setVolume(val) {
-  state.volume = val;
-  elements.volumePercent.textContent = `${Math.round(val * 100)}%`;
+// Volume Management (Locked at 100% Full Master Output)
+function setVolume(val = 1.0) {
+  state.volume = 1.0;
+  if (elements.volumePercent) elements.volumePercent.textContent = `100%`;
   if (state.activeSourceType === 'local') {
     if (!state.isCrossfading) {
-      elements.deckA.volume = state.isMuted ? 0 : val;
-      elements.deckB.volume = state.isMuted ? 0 : val;
+      elements.deckA.volume = state.isMuted ? 0 : 1.0;
+      elements.deckB.volume = state.isMuted ? 0 : 1.0;
     }
   } else if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.setVolume) {
     try {
-      ytPlayer.setVolume(state.isMuted ? 0 : val * 100);
+      ytPlayer.setVolume(state.isMuted ? 0 : 100);
     } catch(e){}
   }
 }
 
-elements.volumeSlider.addEventListener('input', (e) => {
-  state.isMuted = false;
-  setVolume(parseFloat(e.target.value));
-});
+if (elements.volumeSlider) {
+  elements.volumeSlider.addEventListener('input', (e) => {
+    state.isMuted = false;
+    setVolume(1.0);
+  });
+}
 
-elements.muteBtn.addEventListener('click', () => {
-  state.isMuted = !state.isMuted;
-  if (state.isMuted) {
-    elements.volumeIcon.setAttribute('data-lucide', 'volume-x');
-    setVolume(state.volume);
-  } else {
-    elements.volumeIcon.setAttribute('data-lucide', 'volume-2');
-    setVolume(state.volume);
-  }
-  lucide.createIcons();
-});
+if (elements.muteBtn) {
+  elements.muteBtn.addEventListener('click', () => {
+    state.isMuted = !state.isMuted;
+    if (elements.volumeIcon) {
+      elements.volumeIcon.setAttribute('data-lucide', state.isMuted ? 'volume-x' : 'volume-2');
+    }
+    setVolume(1.0);
+    lucide.createIcons();
+  });
+}
 
 // Rotation / Cycle Indicator
 function updateCycleProgress() {
@@ -1659,11 +1660,14 @@ elements.autoPlayToggle.addEventListener('click', () => {
   state.autoDj = !state.autoDj;
   if (state.autoDj) {
     elements.autoPlayToggle.className = 'ml-2 text-xs px-2.5 py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center gap-1.5 transition';
-    showToast("Modo Auto-DJ habilitado", "info");
+    elements.autoPlayToggle.innerHTML = `<i data-lucide="repeat" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Bucle Continuo Activo</span>`;
+    showToast("Reproducción en bucle continuo activada", "info");
   } else {
     elements.autoPlayToggle.className = 'ml-2 text-xs px-2.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 transition';
-    showToast("Modo Auto-DJ deshabilitado (se detendrá al acabar)", "info");
+    elements.autoPlayToggle.innerHTML = `<i data-lucide="repeat" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Bucle Desactivado</span>`;
+    showToast("Bucle desactivado (se detendrá al terminar la lista)", "info");
   }
+  lucide.createIcons();
 });
 
 // ==========================================
