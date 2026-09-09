@@ -456,6 +456,12 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
       try { ytPlayer.pauseVideo(); } catch(e){}
     }
 
+    if (!track.url) {
+      showToast(`Pista local "${track.title}" pendiente. Carga el archivo desde el panel izquierdo para vincularla.`, "warning");
+      setPlayingUI(false);
+      return;
+    }
+
     if (isCrossfadeTransition && state.crossfadeDuration > 0) {
       const outgoingPlayer = getActiveLocalPlayer();
       state.activeDeck = state.activeDeck === 'A' ? 'B' : 'A';
@@ -872,17 +878,26 @@ elements.musicFileInput.addEventListener('change', (e) => {
   files.forEach(file => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
-    state.musicPool.push({
-      id: 'm_' + Math.random().toString(36).substr(2, 9),
-      title: name,
-      type: 'music',
-      source: 'local',
-      url: url,
-      duration: null
-    });
+    
+    // Check if there is a pending local track matching this name
+    const pendingItem = state.musicPool.find(item => item.isPendingLocal && (item.title === name || item.fileName === name || item.fileName === file.name));
+    if (pendingItem) {
+      pendingItem.url = url;
+      pendingItem.isPendingLocal = false;
+    } else {
+      state.musicPool.push({
+        id: 'm_' + Math.random().toString(36).substr(2, 9),
+        title: name,
+        fileName: file.name,
+        type: 'music',
+        source: 'local',
+        url: url,
+        duration: null
+      });
+    }
   });
 
-  showToast(`Se cargaron ${files.length} pista(s) de música`, 'success');
+  showToast(`Se vincularon/cargaron ${files.length} pista(s) de música`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
@@ -894,17 +909,26 @@ elements.jinglesFileInput.addEventListener('change', (e) => {
   files.forEach(file => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
-    state.jinglesPool.push({
-      id: 'j_' + Math.random().toString(36).substr(2, 9),
-      title: name,
-      type: 'jingle',
-      source: 'local',
-      url: url,
-      duration: null
-    });
+    
+    // Check if there is a pending local ad matching this name
+    const pendingItem = state.jinglesPool.find(item => item.isPendingLocal && (item.title === name || item.fileName === name || item.fileName === file.name));
+    if (pendingItem) {
+      pendingItem.url = url;
+      pendingItem.isPendingLocal = false;
+    } else {
+      state.jinglesPool.push({
+        id: 'j_' + Math.random().toString(36).substr(2, 9),
+        title: name,
+        fileName: file.name,
+        type: 'jingle',
+        source: 'local',
+        url: url,
+        duration: null
+      });
+    }
   });
 
-  showToast(`Se cargaron ${files.length} anuncio(s) publicitario(s)`, 'success');
+  showToast(`Se vincularon/cargaron ${files.length} anuncio(s) publicitario(s)`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
@@ -1228,7 +1252,7 @@ elements.autoPlayToggle.addEventListener('click', () => {
 function exportConfigToJson() {
   const data = {
     app: 'AudioMix PRO',
-    version: '2.4',
+    version: '2.5',
     exportDate: new Date().toISOString(),
     settings: {
       rotationRatio: state.rotationRatio,
@@ -1242,6 +1266,7 @@ function exportConfigToJson() {
       type: item.type,
       source: item.source,
       url: item.source === 'local' ? null : item.url,
+      fileName: item.fileName || (item.source === 'local' ? item.title : null),
       ytId: item.ytId || null,
       duration: item.duration || null,
     })),
@@ -1250,6 +1275,7 @@ function exportConfigToJson() {
       type: item.type,
       source: item.source,
       url: item.source === 'local' ? null : item.url,
+      fileName: item.fileName || (item.source === 'local' ? item.title : null),
       ytId: item.ytId || null,
       duration: item.duration || null,
     }))
@@ -1296,33 +1322,76 @@ function importConfigFromJson(file) {
         }
       }
 
+      let localItemsCount = 0;
+
+      // Import Music Items
       if (Array.isArray(imported.musicPool)) {
-        const newMusic = imported.musicPool.filter(item => item.source === 'youtube' && item.ytId).map(item => ({
-          id: 'yt_' + Math.random().toString(36).substr(2, 9),
-          title: item.title || `YouTube Audio [${item.ytId}]`,
-          type: 'music',
-          source: 'youtube',
-          ytId: item.ytId,
-          duration: item.duration || null
-        }));
+        const newMusic = imported.musicPool.map(item => {
+          if (item.source === 'youtube' && item.ytId) {
+            return {
+              id: 'yt_' + Math.random().toString(36).substr(2, 9),
+              title: item.title || `YouTube Audio [${item.ytId}]`,
+              type: 'music',
+              source: 'youtube',
+              ytId: item.ytId,
+              duration: item.duration || null
+            };
+          } else if (item.source === 'local' || item.fileName || !item.ytId) {
+            localItemsCount++;
+            return {
+              id: 'm_' + Math.random().toString(36).substr(2, 9),
+              title: item.title || item.fileName || 'Pista Local',
+              fileName: item.fileName || item.title,
+              type: 'music',
+              source: 'local',
+              url: null, // Pending user file attachment
+              isPendingLocal: true,
+              duration: item.duration || null
+            };
+          }
+          return null;
+        }).filter(Boolean);
         state.musicPool = [...state.musicPool, ...newMusic];
       }
 
+      // Import Ads Items
       const adsArray = imported.adsPool || imported.jinglesPool;
       if (Array.isArray(adsArray)) {
-        const newAds = adsArray.filter(item => item.source === 'youtube' && item.ytId).map(item => ({
-          id: 'yt_' + Math.random().toString(36).substr(2, 9),
-          title: item.title || `YouTube Audio [${item.ytId}]`,
-          type: 'jingle',
-          source: 'youtube',
-          ytId: item.ytId,
-          duration: item.duration || null
-        }));
+        const newAds = adsArray.map(item => {
+          if (item.source === 'youtube' && item.ytId) {
+            return {
+              id: 'yt_' + Math.random().toString(36).substr(2, 9),
+              title: item.title || `YouTube Audio [${item.ytId}]`,
+              type: 'jingle',
+              source: 'youtube',
+              ytId: item.ytId,
+              duration: item.duration || null
+            };
+          } else if (item.source === 'local' || item.fileName || !item.ytId) {
+            localItemsCount++;
+            return {
+              id: 'j_' + Math.random().toString(36).substr(2, 9),
+              title: item.title || item.fileName || 'Anuncio Local',
+              fileName: item.fileName || item.title,
+              type: 'jingle',
+              source: 'local',
+              url: null, // Pending user file attachment
+              isPendingLocal: true,
+              duration: item.duration || null
+            };
+          }
+          return null;
+        }).filter(Boolean);
         state.jinglesPool = [...state.jinglesPool, ...newAds];
       }
 
       rebuildQueue();
-      showToast("¡Configuración y listas importadas correctamente desde JSON!", "success");
+      
+      if (localItemsCount > 0) {
+        showToast(`¡JSON importado! Contiene ${localItemsCount} pista(s) locales. Si deseas reproducirlas, cárgalas desde el panel de archivos.`, "warning");
+      } else {
+        showToast("¡Configuración y listas importadas correctamente desde JSON!", "success");
+      }
 
     } catch(err) {
       console.error("JSON Import error:", err);
