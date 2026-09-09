@@ -469,7 +469,7 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
 
     ytContainer.innerHTML = `
       <div class="relative w-full h-full">
-        <iframe id="ytIframe" width="100%" height="100%" src="${embedUrl}" title="YouTube audio player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen class="w-full h-full rounded-lg"></iframe>
+        <iframe id="ytIframe" width="100%" height="100%" src="${embedUrl}" title="YouTube audio player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="w-full h-full rounded-lg"></iframe>
         <a href="${ytWatchUrl}" target="_blank" rel="noopener noreferrer" title="Abrir en YouTube externo" class="absolute top-2 right-2 bg-black/75 hover:bg-red-600 text-white text-[10px] px-2 py-1 rounded shadow flex items-center gap-1 transition">
           <i data-lucide="external-link" class="w-3 h-3"></i> YouTube
         </a>
