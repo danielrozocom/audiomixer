@@ -1,5 +1,3 @@
-// AudioMix PRO - Engine & Application Logic
-
 // State Management
 const state = {
   musicPool: [],      // Array of items: { id, title, type: 'music', source: 'local'|'youtube', url, ytId, duration }
@@ -8,7 +6,9 @@ const state = {
   currentIndex: -1,   // Current playing index in queue
   isPlaying: false,
   rotationRatio: 2,   // X music tracks per 1 jingle
-  crossfadeDuration: 3.0, // Seconds of overlap crossfade
+  transitionMode: 'chime', // 'chime' (Campana radial), 'jingle' (Cortinilla), 'crossfade', 'cut'
+  customTransitionUrl: null, // Custom user transition jingle URL
+  crossfadeDuration: 2.0, // Seconds of overlap crossfade
   isCrossfading: false,
   autoDj: true,
   volume: 0.8,
@@ -33,11 +33,15 @@ const elements = {
   ytCategorySelect: document.getElementById('ytCategorySelect'),
   importYtBtn: document.getElementById('importYtBtn'),
   importYtBtnText: document.getElementById('importYtBtnText'),
-  loadDemoBtn: document.getElementById('loadDemoBtn'),
   clearAllBtn: document.getElementById('clearAllBtn'),
   
   rotationRatio: document.getElementById('rotationRatio'),
   rotationValueDisplay: document.getElementById('rotationValueDisplay'),
+  transitionModeSelect: document.getElementById('transitionModeSelect'),
+  transitionAudioWrapper: document.getElementById('transitionAudioWrapper'),
+  transitionAudioLabel: document.getElementById('transitionAudioLabel'),
+  transitionFileInput: document.getElementById('transitionFileInput'),
+  crossfadeSliderWrapper: document.getElementById('crossfadeSliderWrapper'),
   crossfadeSlider: document.getElementById('crossfadeSlider'),
   crossfadeValueDisplay: document.getElementById('crossfadeValueDisplay'),
   ratioSummary: document.getElementById('ratioSummary'),
@@ -593,14 +597,101 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
 };
 
 // ==========================================
-// PROFESSIONAL S-CURVE (SMOOTHSTEP) HARMONIC CROSSFADE ENGINE
-// 60FPS Continuous Audio Interpolation for Silky Smooth Radio Transitions
+// RADIO BRIDGE SYNTHESIZER (CAMPANA / CHIME)
+// Generates a crisp studio tubular bell chime bridge via Web Audio API
 // ==========================================
-function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
+function playRadioChime(volume = 0.8) {
+  return new Promise((resolve) => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) { resolve(); return; }
+      const ctx = new AudioContext();
+
+      const chimeGain = ctx.createGain();
+      chimeGain.gain.setValueAtTime(volume * 0.45, ctx.currentTime);
+      chimeGain.connect(ctx.destination);
+
+      // 3 harmonious tubular bell harmonics (C6, E6, G6 chime sweep)
+      const notes = [1046.50, 1318.51, 1567.98];
+      const now = ctx.currentTime;
+
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const noteGain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+
+        noteGain.gain.setValueAtTime(0.001, now + idx * 0.12);
+        noteGain.gain.exponentialRampToValueAtTime(0.6, now + idx * 0.12 + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
+
+        osc.connect(noteGain);
+        noteGain.connect(chimeGain);
+
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.95);
+      });
+
+      setTimeout(() => {
+        try { ctx.close(); } catch(e){}
+        resolve();
+      }, 750);
+    } catch(e) {
+      console.warn("Chime synth error", e);
+      resolve();
+    }
+  });
+}
+
+// Play Transition Cortinilla (Custom audio file or Chime)
+async function triggerTransitionBridge() {
+  if (state.transitionMode === 'cut') return;
+  if (state.transitionMode === 'chime') {
+    await playRadioChime(state.isMuted ? 0 : state.volume);
+  } else if (state.transitionMode === 'jingle' && state.customTransitionUrl) {
+    return new Promise((resolve) => {
+      const bridgeAudio = new Audio(state.customTransitionUrl);
+      bridgeAudio.volume = state.isMuted ? 0 : state.volume;
+      bridgeAudio.onended = () => resolve();
+      bridgeAudio.onerror = () => resolve();
+      bridgeAudio.play().catch(() => resolve());
+      // Maximum bridge duration limit safety
+      setTimeout(resolve, 3500);
+    });
+  } else if (state.transitionMode === 'jingle') {
+    // Fallback to chime if no custom jingle loaded
+    await playRadioChime(state.isMuted ? 0 : state.volume);
+  }
+}
+
+// ==========================================
+// PROFESSIONAL TRANSITION & S-CURVE ENGINE
+// ==========================================
+async function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
   state.isCrossfading = true;
   const targetVolume = state.isMuted ? 0 : state.volume;
-  
-  // High frequency 20ms steps (~50-60 fps for audio volume interpolation)
+
+  if (state.transitionMode === 'chime' || state.transitionMode === 'jingle') {
+    // Fade out outgoing first
+    fadeOutLocalHarmonic(outgoing, 0.4);
+    // Sound chime or cortinilla bridge
+    await triggerTransitionBridge();
+    // Start incoming cleanly
+    incoming.volume = targetVolume;
+    state.isCrossfading = false;
+    return;
+  }
+
+  if (state.transitionMode === 'cut') {
+    outgoing.pause();
+    outgoing.currentTime = 0;
+    incoming.volume = targetVolume;
+    state.isCrossfading = false;
+    return;
+  }
+
+  // Otherwise crossfade mode
   const intervalMs = 20;
   const totalSteps = Math.max(1, Math.round((durationSec * 1000) / intervalMs));
   let step = 0;
@@ -610,11 +701,7 @@ function executeHarmonicCrossfade(outgoing, incoming, durationSec) {
   const fadeTimer = setInterval(() => {
     step++;
     const t = Math.min(1, step / totalSteps);
-    
-    // Smoothstep S-Curve: 3t^2 - 2t^3 for organic radio DJ bridge
     const smoothT = t * t * (3 - 2 * t);
-    
-    // Equal power sinusoidal blended with smoothstep
     const inGain = Math.sin(smoothT * (Math.PI / 2));
     const outGain = Math.cos(smoothT * (Math.PI / 2));
 
@@ -1166,39 +1253,59 @@ function parseYouTubeInput(rawText) {
 }
 
 async function fetchPlaylistItems(playlistId) {
-  try {
-    const endpoints = [
-      `https://invidious.privacydev.net/api/v1/playlists/${playlistId}`,
-      `https://inv.tux.pizza/api/v1/playlists/${playlistId}`,
-      `https://vid.puffyan.us/api/v1/playlists/${playlistId}`
-    ];
+  const endpoints = [
+    `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
+    `https://api.piped.privacydev.net/playlists/${playlistId}`,
+    `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
+    `https://inv.tux.pizza/api/v1/playlists/${playlistId}`,
+    `https://invidious.privacydev.net/api/v1/playlists/${playlistId}`
+  ];
 
-    for (const url of endpoints) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.videos && data.videos.length > 0) {
-            return data.videos.map(v => ({
-              id: v.videoId,
-              title: v.title || `YouTube Audio [${v.videoId}]`,
-              duration: v.lengthSeconds || null
-            }));
-          }
+  for (const url of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        // Piped format
+        if (data && Array.isArray(data.relatedStreams) && data.relatedStreams.length > 0) {
+          return data.relatedStreams.map(v => {
+            const vId = v.url ? v.url.replace('/watch?v=', '') : v.id;
+            return {
+              id: vId,
+              title: v.title || `YouTube Audio [${vId}]`,
+              duration: v.duration || null
+            };
+          }).filter(v => v.id && v.id.length === 11);
         }
-      } catch(e) {}
-    }
-  } catch(err) {
-    console.warn("Direct playlist scrape fallback", err);
+        // Invidious format
+        if (data && Array.isArray(data.videos) && data.videos.length > 0) {
+          return data.videos.map(v => ({
+            id: v.videoId,
+            title: v.title || `YouTube Audio [${v.videoId}]`,
+            duration: v.lengthSeconds || null
+          })).filter(v => v.id && v.id.length === 11);
+        }
+      }
+    } catch(e) {}
   }
+
+  // Fallback: Embed as direct YouTube Playlist Player container
+  let playlistTitle = `Playlist de YouTube [${playlistId.substring(0, 14)}...]`;
+  try {
+    const oEmbedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/playlist?list=${playlistId}`);
+    if (oEmbedRes.ok) {
+      const d = await oEmbedRes.json();
+      if (d.title) playlistTitle = d.title;
+    }
+  } catch(e){}
 
   return [{
     id: playlistId,
     isPlaylistContainer: true,
-    title: `YouTube Playlist [${playlistId.substring(0, 12)}...]`,
+    title: playlistTitle,
     duration: null
   }];
 }
@@ -1348,6 +1455,32 @@ elements.rotationRatio.addEventListener('input', (e) => {
   elements.ratioSummary.textContent = `Ratio: ${val}:1`;
   rebuildQueue();
   showToast(`Rotación actualizada: 1 anuncio cada ${val} canciones`, 'info');
+});
+
+// Transition Mode Selector Listener
+elements.transitionModeSelect.addEventListener('change', (e) => {
+  state.transitionMode = e.target.value;
+  elements.crossfadeSliderWrapper.classList.toggle('hidden', state.transitionMode !== 'crossfade');
+  elements.transitionAudioWrapper.classList.toggle('hidden', state.transitionMode === 'cut' || state.transitionMode === 'crossfade');
+  
+  const modeNames = {
+    chime: 'Campana Radial / Chime',
+    jingle: 'Cortinilla / Cuña de Puente',
+    crossfade: 'Crossfade Suave',
+    cut: 'Corte Directo'
+  };
+  showToast(`Modo de transición cambiado a: ${modeNames[state.transitionMode] || state.transitionMode}`, 'info');
+});
+
+// Transition Jingle Custom File Upload Listener
+elements.transitionFileInput.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) {
+    const file = e.target.files[0];
+    state.customTransitionUrl = URL.createObjectURL(file);
+    elements.transitionAudioLabel.innerHTML = `<i data-lucide="music-2" class="w-3 h-3 text-indigo-500"></i> ${file.name.substring(0, 24)}...`;
+    lucide.createIcons();
+    showToast(`Cortinilla personalizada cargada: ${file.name}`, 'success');
+  }
 });
 
 // Crossfade Slider Listener
