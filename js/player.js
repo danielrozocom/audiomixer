@@ -201,7 +201,10 @@ export function playIndex(index, isCrossfadeTransition = false) {
           videoId: track.isPlaylist ? undefined : track.ytId,
           playerVars: {
             autoplay: 1,
-            controls: 1,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            modestbranding: 1,
             rel: 0,
             playsinline: 1,
             listType: track.isPlaylist ? 'playlist' : undefined,
