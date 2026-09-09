@@ -870,65 +870,201 @@ function stopVisualizer() {
   });
 }
 
-// File Upload Handlers (URL.createObjectURL)
-elements.musicFileInput.addEventListener('change', (e) => {
+// ==========================================
+// INDEXED-DB PERSISTENCE ENGINE
+// ==========================================
+const DB_NAME = 'AudioMixPRO_DB';
+const DB_VERSION = 1;
+const STORE_NAME = 'audio_files';
+
+function openAudioDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function saveAudioBlob(id, blob, metadata = {}) {
+  try {
+    const db = await openAudioDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const record = {
+        id,
+        blob,
+        title: metadata.title || '',
+        fileName: metadata.fileName || '',
+        type: metadata.type || 'music',
+        updatedAt: Date.now()
+      };
+      store.put(record);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn("Error saving audio to IndexedDB:", err);
+  }
+}
+
+async function getAudioBlob(id) {
+  try {
+    const db = await openAudioDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn("Error getting audio from IndexedDB:", err);
+    return null;
+  }
+}
+
+async function getAllStoredAudios() {
+  try {
+    const db = await openAudioDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn("Error getting all audios from IndexedDB:", err);
+    return [];
+  }
+}
+
+async function deleteStoredAudio(id) {
+  try {
+    const db = await openAudioDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn("Error deleting audio from IndexedDB:", err);
+  }
+}
+
+async function clearStoredAudios() {
+  try {
+    const db = await openAudioDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn("Error clearing IndexedDB:", err);
+  }
+}
+
+// Convert Blob/File to Base64 data URL
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Convert Base64 data URL to Blob
+function base64ToBlob(base64Data, defaultType = 'audio/mpeg') {
+  try {
+    const parts = base64Data.split(';base64,');
+    if (parts.length === 2) {
+      const contentType = parts[0].replace('data:', '') || defaultType;
+      const byteCharacters = atob(parts[1]);
+      const byteArrays = [];
+      for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+        const slice = byteCharacters.slice(offset, offset + 512);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+      }
+      return new Blob(byteArrays, { type: contentType });
+    }
+  } catch(e) {
+    console.warn("Error converting base64 to blob:", e);
+  }
+  return null;
+}
+
+// File Upload Handlers (URL.createObjectURL + IndexedDB)
+elements.musicFileInput.addEventListener('change', async (e) => {
   const files = Array.from(e.target.files);
   if (files.length === 0) return;
 
-  files.forEach(file => {
+  for (const file of files) {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
+    const id = 'm_' + Math.random().toString(36).substr(2, 9);
     
-    // Check if there is a pending local track matching this name
-    const pendingItem = state.musicPool.find(item => item.isPendingLocal && (item.title === name || item.fileName === name || item.fileName === file.name));
-    if (pendingItem) {
-      pendingItem.url = url;
-      pendingItem.isPendingLocal = false;
-    } else {
-      state.musicPool.push({
-        id: 'm_' + Math.random().toString(36).substr(2, 9),
-        title: name,
-        fileName: file.name,
-        type: 'music',
-        source: 'local',
-        url: url,
-        duration: null
-      });
-    }
-  });
+    // Save to IndexedDB
+    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'music' });
 
-  showToast(`Se vincularon/cargaron ${files.length} pista(s) de música`, 'success');
+    state.musicPool.push({
+      id: id,
+      title: name,
+      fileName: file.name,
+      type: 'music',
+      source: 'local',
+      url: url,
+      blob: file,
+      duration: null
+    });
+  }
+
+  showToast(`Se cargaron y guardaron ${files.length} pista(s) de música`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
 
-elements.jinglesFileInput.addEventListener('change', (e) => {
+elements.jinglesFileInput.addEventListener('change', async (e) => {
   const files = Array.from(e.target.files);
   if (files.length === 0) return;
 
-  files.forEach(file => {
+  for (const file of files) {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
+    const id = 'j_' + Math.random().toString(36).substr(2, 9);
     
-    // Check if there is a pending local ad matching this name
-    const pendingItem = state.jinglesPool.find(item => item.isPendingLocal && (item.title === name || item.fileName === name || item.fileName === file.name));
-    if (pendingItem) {
-      pendingItem.url = url;
-      pendingItem.isPendingLocal = false;
-    } else {
-      state.jinglesPool.push({
-        id: 'j_' + Math.random().toString(36).substr(2, 9),
-        title: name,
-        fileName: file.name,
-        type: 'jingle',
-        source: 'local',
-        url: url,
-        duration: null
-      });
-    }
-  });
+    // Save to IndexedDB
+    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'jingle' });
 
-  showToast(`Se vincularon/cargaron ${files.length} anuncio(s) publicitario(s)`, 'success');
+    state.jinglesPool.push({
+      id: id,
+      title: name,
+      fileName: file.name,
+      type: 'jingle',
+      source: 'local',
+      url: url,
+      blob: file,
+      duration: null
+    });
+  }
+
+  showToast(`Se cargaron y guardaron ${files.length} anuncio(s) publicitario(s)`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
@@ -1087,8 +1223,8 @@ elements.importYtBtn.addEventListener('click', async () => {
 });
 
 // Load Demo Presets
-elements.loadDemoBtn.addEventListener('click', () => {
-  const generateToneUrl = (freq, duration, type = 'sine') => {
+elements.loadDemoBtn.addEventListener('click', async () => {
+  const generateToneBlob = (freq, duration) => {
     const sampleRate = 44100;
     const numSamples = sampleRate * duration;
     const buffer = new Float32Array(numSamples);
@@ -1121,27 +1257,39 @@ elements.loadDemoBtn.addEventListener('click', () => {
       const s = Math.max(-1, Math.min(1, buffer[i]));
       view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
     }
-    return URL.createObjectURL(new Blob([view], { type: 'audio/wav' }));
+    return new Blob([view], { type: 'audio/wav' });
   };
 
+  const dm1Blob = generateToneBlob(440, 8);
+  const dm2Blob = generateToneBlob(523.25, 9);
+  const dm3Blob = generateToneBlob(659.25, 8);
+  const dj1Blob = generateToneBlob(880, 3);
+  const dj2Blob = generateToneBlob(987.77, 3);
+
+  await saveAudioBlob('dm1', dm1Blob, { title: 'Summer Groove (Deep House)', fileName: 'summer_groove.wav', type: 'music' });
+  await saveAudioBlob('dm2', dm2Blob, { title: 'Midnight Chill Lounge', fileName: 'midnight_chill.wav', type: 'music' });
+  await saveAudioBlob('dm3', dm3Blob, { title: 'Synthwave Neon Drive', fileName: 'synthwave_neon.wav', type: 'music' });
+  await saveAudioBlob('dj1', dj1Blob, { title: 'Anuncio: RadioMix 98.5 FM al Aire', fileName: 'radiomix_fm.wav', type: 'jingle' });
+  await saveAudioBlob('dj2', dj2Blob, { title: 'Spot Publicitario: 50% de Descuento Especial', fileName: 'spot_promo.wav', type: 'jingle' });
+
   state.musicPool = [
-    { id: 'dm1', title: 'Summer Groove (Deep House)', type: 'music', source: 'local', url: generateToneUrl(440, 8), duration: 8 },
-    { id: 'dm2', title: 'Midnight Chill Lounge', type: 'music', source: 'local', url: generateToneUrl(523.25, 9), duration: 9 },
-    { id: 'dm3', title: 'Synthwave Neon Drive', type: 'music', source: 'local', url: generateToneUrl(659.25, 8), duration: 8 }
+    { id: 'dm1', title: 'Summer Groove (Deep House)', fileName: 'summer_groove.wav', type: 'music', source: 'local', url: URL.createObjectURL(dm1Blob), blob: dm1Blob, duration: 8 },
+    { id: 'dm2', title: 'Midnight Chill Lounge', fileName: 'midnight_chill.wav', type: 'music', source: 'local', url: URL.createObjectURL(dm2Blob), blob: dm2Blob, duration: 9 },
+    { id: 'dm3', title: 'Synthwave Neon Drive', fileName: 'synthwave_neon.wav', type: 'music', source: 'local', url: URL.createObjectURL(dm3Blob), blob: dm3Blob, duration: 8 }
   ];
 
   state.jinglesPool = [
-    { id: 'dj1', title: 'Anuncio: RadioMix 98.5 FM al Aire', type: 'jingle', source: 'local', url: generateToneUrl(880, 3), duration: 3 },
-    { id: 'dj2', title: 'Spot Publicitario: 50% de Descuento Especial', type: 'jingle', source: 'local', url: generateToneUrl(987.77, 3), duration: 3 }
+    { id: 'dj1', title: 'Anuncio: RadioMix 98.5 FM al Aire', fileName: 'radiomix_fm.wav', type: 'jingle', source: 'local', url: URL.createObjectURL(dj1Blob), blob: dj1Blob, duration: 3 },
+    { id: 'dj2', title: 'Spot Publicitario: 50% de Descuento Especial', fileName: 'spot_promo.wav', type: 'jingle', source: 'local', url: URL.createObjectURL(dj2Blob), blob: dj2Blob, duration: 3 }
   ];
 
-  showToast("Pistas demo cargadas (Música + Anuncios)", "success");
+  showToast("Pistas demo cargadas y listas para reproducir", "success");
   rebuildQueue();
   playIndex(0);
 });
 
 // Clear All
-elements.clearAllBtn.addEventListener('click', () => {
+elements.clearAllBtn.addEventListener('click', async () => {
   if (confirm("¿Estás seguro de vaciar todas las listas y la cola de reproducción?")) {
     elements.deckA.pause();
     elements.deckB.pause();
@@ -1151,9 +1299,10 @@ elements.clearAllBtn.addEventListener('click', () => {
     state.jinglesPool = [];
     state.queue = [];
     state.currentIndex = -1;
+    await clearStoredAudios();
     setPlayingUI(false);
     renderAllLists();
-    showToast("Se limpiaron todas las fuentes", "info");
+    showToast("Se limpiaron todas las fuentes y la memoria local", "info");
   }
 });
 
@@ -1184,11 +1333,13 @@ window.removeItemFromQueue = function(index, e) {
 };
 
 // Remove item from pool
-window.removePoolItem = function(type, index) {
+window.removePoolItem = async function(type, index) {
   if (type === 'music') {
-    state.musicPool.splice(index, 1);
+    const [removed] = state.musicPool.splice(index, 1);
+    if (removed && removed.id) await deleteStoredAudio(removed.id);
   } else {
-    state.jinglesPool.splice(index, 1);
+    const [removed] = state.jinglesPool.splice(index, 1);
+    if (removed && removed.id) await deleteStoredAudio(removed.id);
   }
   rebuildQueue();
 };
@@ -1247,12 +1398,55 @@ elements.autoPlayToggle.addEventListener('click', () => {
 });
 
 // ==========================================
-// JSON EXPORT & IMPORT SYSTEM
+// JSON EXPORT & IMPORT SYSTEM (WITH FULL AUDIO DATA)
 // ==========================================
-function exportConfigToJson() {
+async function exportConfigToJson() {
+  showToast("Preparando exportación con datos de audio...", "info");
+
+  // Helper to convert pool item to export format with audioData if local
+  const preparePoolExport = async (pool) => {
+    return Promise.all(pool.map(async (item) => {
+      let audioData = null;
+      if (item.source === 'local') {
+        let blob = item.blob;
+        if (!blob && item.id) {
+          const stored = await getAudioBlob(item.id);
+          if (stored && stored.blob) blob = stored.blob;
+        }
+        if (!blob && item.url && item.url.startsWith('blob:')) {
+          try {
+            const res = await fetch(item.url);
+            blob = await res.blob();
+          } catch(e){}
+        }
+        if (blob) {
+          try {
+            audioData = await blobToBase64(blob);
+          } catch (e) {
+            console.warn("Could not encode audio to base64", e);
+          }
+        }
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        source: item.source,
+        audioData: audioData,
+        fileName: item.fileName || (item.source === 'local' ? item.title : null),
+        ytId: item.ytId || null,
+        duration: item.duration || null,
+      };
+    }));
+  };
+
+  const exportedMusic = await preparePoolExport(state.musicPool);
+  const exportedAds = await preparePoolExport(state.jinglesPool);
+
   const data = {
     app: 'AudioMix PRO',
-    version: '2.5',
+    version: '3.0',
     exportDate: new Date().toISOString(),
     settings: {
       rotationRatio: state.rotationRatio,
@@ -1261,45 +1455,30 @@ function exportConfigToJson() {
       volume: state.volume,
       theme: state.theme,
     },
-    musicPool: state.musicPool.map(item => ({
-      title: item.title,
-      type: item.type,
-      source: item.source,
-      url: item.source === 'local' ? null : item.url,
-      fileName: item.fileName || (item.source === 'local' ? item.title : null),
-      ytId: item.ytId || null,
-      duration: item.duration || null,
-    })),
-    adsPool: state.jinglesPool.map(item => ({
-      title: item.title,
-      type: item.type,
-      source: item.source,
-      url: item.source === 'local' ? null : item.url,
-      fileName: item.fileName || (item.source === 'local' ? item.title : null),
-      ytId: item.ytId || null,
-      duration: item.duration || null,
-    }))
+    musicPool: exportedMusic,
+    adsPool: exportedAds
   };
 
-  const jsonStr = JSON.stringify(data, null, 2);
+  const jsonStr = JSON.stringify(data);
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const timestamp = new Date().toISOString().slice(0,10);
   a.href = url;
-  a.download = `audiomix_config_${timestamp}.json`;
+  a.download = `audiomix_completo_${timestamp}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast("Configuración y listas exportadas exitosamente a JSON", "success");
+  showToast("¡Configuración y audios exportados exitosamente a JSON!", "success");
 }
 
-function importConfigFromJson(file) {
+async function importConfigFromJson(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
+      showToast("Importando y procesando archivo...", "info");
       const imported = JSON.parse(e.target.result);
       if (!imported || (!imported.musicPool && !imported.adsPool && !imported.jinglesPool && !imported.settings)) {
         throw new Error("Estructura de archivo JSON no válida");
@@ -1322,76 +1501,77 @@ function importConfigFromJson(file) {
         }
       }
 
-      let localItemsCount = 0;
+      let restoredLocalCount = 0;
 
-      // Import Music Items
-      if (Array.isArray(imported.musicPool)) {
-        const newMusic = imported.musicPool.map(item => {
+      // Helper to process and restore items
+      const processItems = async (items, defaultType) => {
+        if (!Array.isArray(items)) return [];
+        const result = [];
+        for (const item of items) {
+          const type = item.type || defaultType;
           if (item.source === 'youtube' && item.ytId) {
-            return {
-              id: 'yt_' + Math.random().toString(36).substr(2, 9),
+            result.push({
+              id: item.id || ('yt_' + Math.random().toString(36).substr(2, 9)),
               title: item.title || `YouTube Audio [${item.ytId}]`,
-              type: 'music',
+              type: type,
               source: 'youtube',
               ytId: item.ytId,
               duration: item.duration || null
-            };
-          } else if (item.source === 'local' || item.fileName || !item.ytId) {
-            localItemsCount++;
-            return {
-              id: 'm_' + Math.random().toString(36).substr(2, 9),
-              title: item.title || item.fileName || 'Pista Local',
-              fileName: item.fileName || item.title,
-              type: 'music',
-              source: 'local',
-              url: null, // Pending user file attachment
-              isPendingLocal: true,
-              duration: item.duration || null
-            };
-          }
-          return null;
-        }).filter(Boolean);
-        state.musicPool = [...state.musicPool, ...newMusic];
-      }
+            });
+          } else {
+            // Local track
+            const id = item.id || ((type === 'music' ? 'm_' : 'j_') + Math.random().toString(36).substr(2, 9));
+            let blob = null;
+            let url = null;
 
-      // Import Ads Items
+            if (item.audioData && item.audioData.startsWith('data:')) {
+              blob = base64ToBlob(item.audioData);
+            }
+
+            // Check if already in IndexedDB if no embedded data
+            if (!blob && item.id) {
+              const stored = await getAudioBlob(item.id);
+              if (stored && stored.blob) {
+                blob = stored.blob;
+              }
+            }
+
+            if (blob) {
+              await saveAudioBlob(id, blob, {
+                title: item.title || item.fileName || 'Pista Local',
+                fileName: item.fileName || item.title || 'audio.mp3',
+                type: type
+              });
+              url = URL.createObjectURL(blob);
+              restoredLocalCount++;
+            }
+
+            result.push({
+              id: id,
+              title: item.title || item.fileName || (type === 'music' ? 'Pista Local' : 'Anuncio Local'),
+              fileName: item.fileName || item.title,
+              type: type,
+              source: 'local',
+              url: url,
+              blob: blob,
+              isPendingLocal: !url,
+              duration: item.duration || null
+            });
+          }
+        }
+        return result;
+      };
+
+      const newMusic = await processItems(imported.musicPool, 'music');
       const adsArray = imported.adsPool || imported.jinglesPool;
-      if (Array.isArray(adsArray)) {
-        const newAds = adsArray.map(item => {
-          if (item.source === 'youtube' && item.ytId) {
-            return {
-              id: 'yt_' + Math.random().toString(36).substr(2, 9),
-              title: item.title || `YouTube Audio [${item.ytId}]`,
-              type: 'jingle',
-              source: 'youtube',
-              ytId: item.ytId,
-              duration: item.duration || null
-            };
-          } else if (item.source === 'local' || item.fileName || !item.ytId) {
-            localItemsCount++;
-            return {
-              id: 'j_' + Math.random().toString(36).substr(2, 9),
-              title: item.title || item.fileName || 'Anuncio Local',
-              fileName: item.fileName || item.title,
-              type: 'jingle',
-              source: 'local',
-              url: null, // Pending user file attachment
-              isPendingLocal: true,
-              duration: item.duration || null
-            };
-          }
-          return null;
-        }).filter(Boolean);
-        state.jinglesPool = [...state.jinglesPool, ...newAds];
-      }
+      const newAds = await processItems(adsArray, 'jingle');
+
+      state.musicPool = [...state.musicPool, ...newMusic];
+      state.jinglesPool = [...state.jinglesPool, ...newAds];
 
       rebuildQueue();
       
-      if (localItemsCount > 0) {
-        showToast(`¡JSON importado! Contiene ${localItemsCount} pista(s) locales. Si deseas reproducirlas, cárgalas desde el panel de archivos.`, "warning");
-      } else {
-        showToast("¡Configuración y listas importadas correctamente desde JSON!", "success");
-      }
+      showToast(`¡JSON importado con éxito! (${newMusic.length + newAds.length} elementos agregados)`, "success");
 
     } catch(err) {
       console.error("JSON Import error:", err);
@@ -1399,6 +1579,37 @@ function importConfigFromJson(file) {
     }
   };
   reader.readAsText(file);
+}
+
+// Auto-hydrate persisted tracks from IndexedDB on page start
+async function hydrateFromIndexedDB() {
+  try {
+    const storedAudios = await getAllStoredAudios();
+    if (storedAudios && storedAudios.length > 0) {
+      storedAudios.forEach(item => {
+        const url = URL.createObjectURL(item.blob);
+        const track = {
+          id: item.id,
+          title: item.title || item.fileName || 'Pista Local',
+          fileName: item.fileName || item.title,
+          type: item.type || 'music',
+          source: 'local',
+          url: url,
+          blob: item.blob,
+          duration: null
+        };
+        if (item.type === 'jingle') {
+          state.jinglesPool.push(track);
+        } else {
+          state.musicPool.push(track);
+        }
+      });
+      rebuildQueue();
+      showToast(`Se restauraron ${storedAudios.length} pistas guardadas automáticamente`, 'info');
+    }
+  } catch (err) {
+    console.warn("Could not load stored audio:", err);
+  }
 }
 
 // Attach JSON Import/Export listeners
@@ -1429,6 +1640,8 @@ window.addEventListener('keydown', (e) => {
 const savedTheme = localStorage.getItem('audiomix_theme') || 'dark';
 applyTheme(savedTheme);
 
-// Initialize Lucide Icons & Lists
+// Initialize Lucide Icons & Lists & restore IndexedDB
 lucide.createIcons();
 renderAllLists();
+hydrateFromIndexedDB();
+
