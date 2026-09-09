@@ -899,11 +899,30 @@ function playPrev() {
   playIndex(prevIdx, false);
 }
 
-function handleTrackEnd() {
-  if (state.autoDj) {
-    playNext(false);
-  } else {
+// Handle natural end of track (when song or ad finishes 100%)
+async function handleTrackEnd() {
+  if (!state.autoDj || state.queue.length === 0) {
     setPlayingUI(false);
+    return;
+  }
+
+  let nextIdx = state.currentIndex + 1;
+  if (nextIdx >= state.queue.length) {
+    nextIdx = 0;
+    showToast("Reiniciando ciclo de reproducción", "info");
+  }
+
+  const nextTrack = state.queue[nextIdx];
+  const isJingleNext = nextTrack && nextTrack.type === 'jingle';
+
+  // In chime or cortinilla mode, play the bridge cleanly between full tracks!
+  if (state.transitionMode === 'chime' || state.transitionMode === 'jingle') {
+    state.isCrossfading = true;
+    await triggerTransitionBridge(isJingleNext);
+    state.isCrossfading = false;
+    playIndex(nextIdx, false);
+  } else {
+    playIndex(nextIdx, false);
   }
 }
 
@@ -923,9 +942,9 @@ function handleTrackEnd() {
   });
 });
 
-// Check when current track is close to end to trigger crossfade transition
+// Check when current track is close to end to trigger crossfade transition (ONLY in crossfade mode)
 function checkAutoCrossfade(player) {
-  if (!state.autoDj || state.isCrossfading || state.crossfadeDuration <= 0) return;
+  if (!state.autoDj || state.isCrossfading || state.transitionMode !== 'crossfade' || state.crossfadeDuration <= 0) return;
   if (!player.duration || player.duration < state.crossfadeDuration * 2) return;
 
   const timeLeft = player.duration - player.currentTime;
@@ -934,9 +953,9 @@ function checkAutoCrossfade(player) {
   }
 }
 
-// Check auto-crossfade for YouTube
+// Check auto-crossfade for YouTube (ONLY in crossfade mode)
 function checkYtCrossfade(currentTime, duration) {
-  if (!state.autoDj || state.isCrossfading || state.crossfadeDuration <= 0) return;
+  if (!state.autoDj || state.isCrossfading || state.transitionMode !== 'crossfade' || state.crossfadeDuration <= 0) return;
   if (!duration || duration < state.crossfadeDuration * 2) return;
 
   const timeLeft = duration - currentTime;
