@@ -1661,41 +1661,37 @@ elements.rotationRatio.addEventListener('input', (e) => {
   showToast(`Rotación actualizada: 1 anuncio cada ${val} canciones`, 'info');
 });
 
-// Transition Mode Selector Listener
-elements.transitionModeSelect.addEventListener('change', (e) => {
-  state.transitionMode = e.target.value;
-  elements.crossfadeSliderWrapper.classList.toggle('hidden', state.transitionMode !== 'crossfade');
-  elements.transitionAudioWrapper.classList.toggle('hidden', state.transitionMode === 'cut' || state.transitionMode === 'crossfade');
-  
-  const modeNames = {
-    chime: 'Campana Radial / Chime',
-    jingle: 'Cortinilla / Cuña de Puente',
-    crossfade: 'Crossfade Suave',
-    cut: 'Corte Directo'
-  };
-  showToast(`Modo de transición cambiado a: ${modeNames[state.transitionMode] || state.transitionMode}`, 'info');
-});
+// Transition Mode Selector Listener (Fixed Broadcast Radio Chime)
+if (elements.transitionModeSelect) {
+  elements.transitionModeSelect.addEventListener('change', (e) => {
+    state.transitionMode = 'chime';
+  });
+}
 
-// Preview Radio Chime / Cortinilla Button
+// Preview Radio Chime Button
 if (elements.previewChimeBtn) {
   elements.previewChimeBtn.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    showToast("Reproduciendo sonido de campana/cortinilla...", "info");
+    showToast("Reproduciendo sonido de campana radial...", "info");
     await triggerTransitionBridge(true);
   });
 }
 
 // Transition Jingle Custom File Upload Listener
-elements.transitionFileInput.addEventListener('change', (e) => {
-  if (e.target.files && e.target.files[0]) {
-    const file = e.target.files[0];
-    state.customTransitionUrl = URL.createObjectURL(file);
-    elements.transitionAudioLabel.innerHTML = `<i data-lucide="music-2" class="w-3 h-3 text-indigo-500"></i> ${file.name.substring(0, 24)}...`;
-    lucide.createIcons();
-    showToast(`Cortinilla personalizada cargada: ${file.name}`, 'success');
-  }
-});
+if (elements.transitionFileInput) {
+  elements.transitionFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      state.customTransitionUrl = URL.createObjectURL(file);
+      if (elements.transitionAudioLabel) {
+        elements.transitionAudioLabel.innerHTML = `<i data-lucide="music-2" class="w-3 h-3 text-indigo-500"></i> ${file.name.substring(0, 24)}...`;
+      }
+      lucide.createIcons();
+      showToast(`Cortinilla personalizada cargada: ${file.name}`, 'success');
+    }
+  });
+}
 
 // Crossfade Slider Listener
 elements.crossfadeSlider.addEventListener('input', (e) => {
