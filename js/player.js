@@ -344,14 +344,14 @@ window.playIndex = playIndex;
 export function startVisualizer() {
   if (visualizerTimer) clearInterval(visualizerTimer);
   const currentTrack = state.currentIndex >= 0 && state.queue[state.currentIndex] ? state.queue[state.currentIndex] : null;
-  const isJingle = currentTrack && currentTrack.type === 'jingle';
+  const isAmber = state.isCrossfading || (currentTrack && currentTrack.type === 'jingle');
 
   visualizerTimer = setInterval(() => {
     elements.visualizerBars.forEach(bar => {
       const h = Math.floor(Math.random() * 16) + 4;
       bar.style.height = `${h}px`;
       bar.className = `bar w-1 rounded-full transition-all ${
-        isJingle ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-indigo-500 shadow-sm shadow-indigo-500/50'
+        isAmber ? 'bg-amber-500 shadow-sm shadow-amber-500/50' : 'bg-indigo-500 shadow-sm shadow-indigo-500/50'
       }`;
     });
   }, 90);
@@ -371,6 +371,12 @@ export function setIsSeeking(val) { isSeeking = val; }
 export function startProgressTracking() {
   if (progressTimer) clearInterval(progressTimer);
   progressTimer = setInterval(() => {
+    if (state.isCrossfading) {
+      elements.currentTime.textContent = "00:00";
+      elements.totalDuration.textContent = "--:--";
+      elements.trackProgress.value = 0;
+      return;
+    }
     if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.getCurrentTime && ytPlayer.getDuration) {
       try {
         const cur = ytPlayer.getCurrentTime() || 0;
@@ -388,6 +394,12 @@ export function startProgressTracking() {
 }
 
 export function updateProgress() {
+  if (state.isCrossfading) {
+    elements.currentTime.textContent = "00:00";
+    elements.totalDuration.textContent = "--:--";
+    elements.trackProgress.value = 0;
+    return;
+  }
   if (state.activeSourceType === 'local') {
     const p = getActiveLocalPlayer();
     const cur = p.currentTime || 0;
