@@ -380,7 +380,7 @@ function renderAllLists() {
           <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-400"></i>
           <div class="truncate flex-1">
             <p class="font-medium text-zinc-800 dark:text-zinc-200 truncate">${item.title}</p>
-            <span class="text-[10px] text-zinc-400 capitalize">${item.source}</span>
+            <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
         <button onclick="removePoolItem('music', ${index})" class="text-zinc-400 hover:text-red-500 p-1">
@@ -406,7 +406,7 @@ function renderAllLists() {
           <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-400"></i>
           <div class="truncate flex-1">
             <p class="font-medium text-amber-700 dark:text-amber-200 truncate">${item.title}</p>
-            <span class="text-[10px] text-zinc-400 capitalize">${item.source}</span>
+            <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
         <button onclick="removePoolItem('jingle', ${index})" class="text-zinc-400 hover:text-red-500 p-1">
@@ -414,7 +414,7 @@ function renderAllLists() {
         </button>
       `;
       setupDragItem(el, index, 'jingles');
-  elements.jinglesList.appendChild(el);
+      elements.jinglesList.appendChild(el);
     });
   }
 
@@ -1159,7 +1159,26 @@ function base64ToBlob(base64Data, defaultType = 'audio/mpeg') {
   return null;
 }
 
-// File Upload Handlers (URL.createObjectURL + IndexedDB)
+// Helper to extract audio duration from file or blob
+function getAudioDuration(fileOrBlob) {
+  return new Promise((resolve) => {
+    const tempAudio = new Audio();
+    const tempUrl = URL.createObjectURL(fileOrBlob);
+    tempAudio.src = tempUrl;
+    tempAudio.addEventListener('loadedmetadata', () => {
+      const dur = tempAudio.duration;
+      URL.revokeObjectURL(tempUrl);
+      resolve(dur && !isNaN(dur) && isFinite(dur) ? dur : null);
+    });
+    tempAudio.addEventListener('error', () => {
+      URL.revokeObjectURL(tempUrl);
+      resolve(null);
+    });
+    setTimeout(() => resolve(null), 3000);
+  });
+}
+
+// File Upload Handlers (URL.createObjectURL + IndexedDB + Duration)
 elements.musicFileInput.addEventListener('change', async (e) => {
   const files = Array.from(e.target.files);
   if (files.length === 0) return;
@@ -1168,9 +1187,10 @@ elements.musicFileInput.addEventListener('change', async (e) => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
     const id = 'm_' + Math.random().toString(36).substr(2, 9);
+    const duration = await getAudioDuration(file);
     
     // Save to IndexedDB
-    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'music' });
+    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'music', duration });
 
     state.musicPool.push({
       id: id,
@@ -1180,11 +1200,11 @@ elements.musicFileInput.addEventListener('change', async (e) => {
       source: 'local',
       url: url,
       blob: file,
-      duration: null
+      duration: duration
     });
   }
 
-  showToast(`Se cargaron y guardaron ${files.length} pista(s) de música`, 'success');
+  showToast(`Se cargaron ${files.length} pista(s) de música`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
@@ -1197,9 +1217,10 @@ elements.jinglesFileInput.addEventListener('change', async (e) => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^/.]+$/, "");
     const id = 'j_' + Math.random().toString(36).substr(2, 9);
+    const duration = await getAudioDuration(file);
     
     // Save to IndexedDB
-    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'jingle' });
+    await saveAudioBlob(id, file, { title: name, fileName: file.name, type: 'jingle', duration });
 
     state.jinglesPool.push({
       id: id,
@@ -1209,11 +1230,11 @@ elements.jinglesFileInput.addEventListener('change', async (e) => {
       source: 'local',
       url: url,
       blob: file,
-      duration: null
+      duration: duration
     });
   }
 
-  showToast(`Se cargaron y guardaron ${files.length} anuncio(s) publicitario(s)`, 'success');
+  showToast(`Se cargaron ${files.length} anuncio(s) publicitario(s)`, 'success');
   rebuildQueue();
   e.target.value = '';
 });
