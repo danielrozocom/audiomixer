@@ -41,6 +41,7 @@ const elements = {
   transitionAudioWrapper: document.getElementById('transitionAudioWrapper'),
   transitionAudioLabel: document.getElementById('transitionAudioLabel'),
   transitionFileInput: document.getElementById('transitionFileInput'),
+  previewChimeBtn: document.getElementById('previewChimeBtn'),
   crossfadeSliderWrapper: document.getElementById('crossfadeSliderWrapper'),
   crossfadeSlider: document.getElementById('crossfadeSlider'),
   crossfadeValueDisplay: document.getElementById('crossfadeValueDisplay'),
@@ -605,19 +606,33 @@ window.playIndex = function(index, isCrossfadeTransition = false) {
 
 // ==========================================
 // RADIO BRIDGE SYNTHESIZER (CAMPANA / CHIME)
-// Studio Tubular Bells Synthesizer with Unstoppable Web Audio + HTML5 Audio fallback
+// Studio Tubular Bells Synthesizer with Unstoppable Web Audio
 // ==========================================
 let sharedAudioCtx = null;
 function getSharedAudioContext() {
   if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) sharedAudioCtx = new AudioContext();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      sharedAudioCtx = new AudioContextClass();
+    }
   }
   if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume();
+    sharedAudioCtx.resume().catch(() => {});
   }
   return sharedAudioCtx;
 }
+
+// Unlock audio context on any user interaction with page
+['click', 'touchstart', 'keydown'].forEach(evt => {
+  document.addEventListener(evt, () => {
+    try {
+      const ctx = getSharedAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch(e){}
+  }, { passive: true, once: false });
+});
 
 function playRadioChime(volume = 0.8, isJingleNext = false) {
   return new Promise((resolve) => {
@@ -625,10 +640,27 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
       const ctx = getSharedAudioContext();
       if (!ctx) { resolve(); return; }
 
-      const chimeGain = ctx.createGain();
-      const safeVol = Math.max(0.3, Math.min(1.0, (state.isMuted ? 0.6 : state.volume) * 0.7));
-      chimeGain.gain.setValueAtTime(safeVol, ctx.currentTime);
-      chimeGain.connect(ctx.destination);
+      // Make sure context is running
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(() => doChime(ctx, resolve)).catch(() => {
+          doChime(ctx, resolve);
+        });
+      } else {
+        doChime(ctx, resolve);
+      }
+    } catch(e) {
+      console.warn("Chime synth error", e);
+      resolve();
+    }
+  });
+
+  function doChime(ctx, resolve) {
+    try {
+      const masterGain = ctx.createGain();
+      const currentVol = state.isMuted ? 0.6 : (state.volume || 0.8);
+      const safeVol = Math.max(0.35, Math.min(1.0, currentVol));
+      masterGain.gain.setValueAtTime(safeVol, ctx.currentTime);
+      masterGain.connect(ctx.destination);
 
       const now = ctx.currentTime;
 
@@ -650,18 +682,18 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(item.freq, item.time);
 
-          noteGain.gain.setValueAtTime(0.001, item.time);
-          noteGain.gain.exponentialRampToValueAtTime(0.8, item.time + 0.02);
+          noteGain.gain.setValueAtTime(0.0001, item.time);
+          noteGain.gain.exponentialRampToValueAtTime(0.85, item.time + 0.02);
           noteGain.gain.exponentialRampToValueAtTime(0.0001, item.time + 0.9);
 
           osc.connect(noteGain);
-          noteGain.connect(chimeGain);
+          noteGain.connect(masterGain);
 
           osc.start(item.time);
           osc.stop(item.time + 0.95);
         });
 
-        setTimeout(resolve, 1200);
+        setTimeout(resolve, 1100);
 
       } else {
         // Crisp 3-bell sweep for regular song transitions
@@ -673,12 +705,12 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, now + idx * 0.12);
 
-          noteGain.gain.setValueAtTime(0.001, now + idx * 0.12);
-          noteGain.gain.exponentialRampToValueAtTime(0.65, now + idx * 0.12 + 0.02);
+          noteGain.gain.setValueAtTime(0.0001, now + idx * 0.12);
+          noteGain.gain.exponentialRampToValueAtTime(0.75, now + idx * 0.12 + 0.02);
           noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
 
           osc.connect(noteGain);
-          noteGain.connect(chimeGain);
+          noteGain.connect(masterGain);
 
           osc.start(now + idx * 0.12);
           osc.stop(now + idx * 0.12 + 0.95);
@@ -687,10 +719,10 @@ function playRadioChime(volume = 0.8, isJingleNext = false) {
         setTimeout(resolve, 800);
       }
     } catch(e) {
-      console.warn("Chime synth error", e);
+      console.warn("Chime execution error", e);
       resolve();
     }
-  });
+  }
 }
 
 // Play Transition Cortinilla (Custom uploaded jingle or Automatic Radio Chime)
@@ -1567,6 +1599,16 @@ elements.transitionModeSelect.addEventListener('change', (e) => {
   };
   showToast(`Modo de transición cambiado a: ${modeNames[state.transitionMode] || state.transitionMode}`, 'info');
 });
+
+// Preview Radio Chime / Cortinilla Button
+if (elements.previewChimeBtn) {
+  elements.previewChimeBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showToast("Reproduciendo sonido de campana/cortinilla...", "info");
+    await triggerTransitionBridge(true);
+  });
+}
 
 // Transition Jingle Custom File Upload Listener
 elements.transitionFileInput.addEventListener('change', (e) => {
