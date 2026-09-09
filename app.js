@@ -227,19 +227,16 @@ elements.playPauseBtn.addEventListener('click', togglePlayPause);
 elements.nextBtn.addEventListener('click', () => playNext(false));
 elements.prevBtn.addEventListener('click', playPrev);
 
-elements.autoPlayToggle.addEventListener('click', () => {
-  state.autoDj = !state.autoDj;
-  if (state.autoDj) {
-    elements.autoPlayToggle.className = 'ml-2 text-xs px-2.5 py-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center gap-1.5 transition';
-    elements.autoPlayToggle.innerHTML = `<i data-lucide="repeat" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Bucle Continuo Activo</span>`;
-    showToast("Reproducción en bucle continuo activada", "info");
-  } else {
-    elements.autoPlayToggle.className = 'ml-2 text-xs px-2.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 transition';
-    elements.autoPlayToggle.innerHTML = `<i data-lucide="repeat" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Bucle Desactivado</span>`;
-    showToast("Bucle desactivado (se detendrá al terminar la lista)", "info");
-  }
-  if (window.lucide) lucide.createIcons();
-});
+if (elements.autoPlayToggle) {
+  elements.autoPlayToggle.addEventListener('click', () => {
+    state.autoDj = !state.autoDj;
+    if (state.autoDj) {
+      showToast("Reproducción en bucle continuo activada", "info");
+    } else {
+      showToast("Bucle desactivado", "info");
+    }
+  });
+}
 
 // Scrubbing (Seek bar)
 elements.trackProgress.addEventListener('input', (e) => {
