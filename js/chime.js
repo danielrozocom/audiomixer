@@ -118,7 +118,7 @@ export function playRadioChime(volume = 1.0, isJingleNext = false) {
 }
 
 export const DEFAULT_CHIME_YT_ID = 'SbI3YqGSNPc';
-let ytChimePlayer = null;
+export let ytChimePlayer = null;
 
 export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
   return new Promise((resolve) => {
@@ -128,13 +128,24 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
         return;
       }
 
-      const timeoutSafety = setTimeout(() => {
+      let isResolved = false;
+      let checkInterval = null;
+
+      const finishChime = () => {
+        if (isResolved) return;
+        isResolved = true;
+        if (checkInterval) clearInterval(checkInterval);
         resolve();
-      }, 3500);
+      };
+
+      // Safety timeout: video is ~2-3 seconds long
+      const safetyTimer = setTimeout(() => {
+        finishChime();
+      }, 4500);
 
       const onEnded = () => {
-        clearTimeout(timeoutSafety);
-        resolve();
+        clearTimeout(safetyTimer);
+        finishChime();
       };
 
       if (!ytChimePlayer || !ytChimePlayer.loadVideoById) {
@@ -162,7 +173,7 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
               }
             },
             onError: () => {
-              clearTimeout(timeoutSafety);
+              clearTimeout(safetyTimer);
               playRadioChime(state.volume, true).then(resolve);
             }
           }
@@ -172,6 +183,20 @@ export function playYouTubeChime(videoId = DEFAULT_CHIME_YT_ID) {
         ytChimePlayer.loadVideoById(videoId);
         ytChimePlayer.playVideo();
       }
+
+      // Check current time / duration as backup to onEnded
+      checkInterval = setInterval(() => {
+        if (ytChimePlayer && ytChimePlayer.getCurrentTime && ytChimePlayer.getDuration) {
+          try {
+            const cur = ytChimePlayer.getCurrentTime() || 0;
+            const dur = ytChimePlayer.getDuration() || 0;
+            if (dur > 0 && cur >= dur - 0.2) {
+              onEnded();
+            }
+          } catch(e){}
+        }
+      }, 250);
+
     } catch (e) {
       console.warn("YouTube chime playback error:", e);
       playRadioChime(state.volume, true).then(resolve);

@@ -1,6 +1,6 @@
 import { state, elements } from './state.js';
 import { formatTime, showToast } from './utils.js';
-import { triggerTransitionBridge } from './chime.js';
+import { triggerTransitionBridge, ytChimePlayer } from './chime.js';
 import { renderAllLists, updateCycleProgress } from './playlist.js';
 
 export let ytPlayer = null;
@@ -89,12 +89,18 @@ export function togglePlayPause() {
     } else if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.pauseVideo) {
       try { ytPlayer.pauseVideo(); } catch(e){}
     }
+    if (ytChimePlayer && ytChimePlayer.pauseVideo) {
+      try { ytChimePlayer.pauseVideo(); } catch(e){}
+    }
     setPlayingUI(false);
   } else {
     if (state.activeSourceType === 'local') {
       getActiveLocalPlayer().play();
     } else if (state.activeSourceType === 'youtube' && ytPlayer && ytPlayer.playVideo) {
       try { ytPlayer.playVideo(); } catch(e){}
+    }
+    if (ytChimePlayer && ytChimePlayer.playVideo) {
+      try { ytChimePlayer.playVideo(); } catch(e){}
     }
     setPlayingUI(true);
     startVisualizer();
@@ -142,6 +148,11 @@ export async function handleTrackEnd() {
   // Chime triggers strictly before ads/commercials
   if (isJingleNext) {
     state.isCrossfading = true;
+    elements.currentTrackTitle.textContent = "Cortinilla Radial...";
+    elements.currentTrackArtist.textContent = `Próximo: ${nextTrack.title}`;
+    elements.playingBadge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+    elements.playingBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> CORTINILLA';
+    
     await triggerTransitionBridge(true);
     state.isCrossfading = false;
   }
