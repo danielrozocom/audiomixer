@@ -125,15 +125,28 @@ export async function fetchPlaylistItems(playlistId) {
     } catch (_) {}
   }
 
-  // Fallback 3: Si todo falla, incrustar la playlist completa
+  // Fallback 3: Si todo falla, incrustar la playlist con su título oficial
   let playlistTitle = `Playlist de YouTube [${playlistId.substring(0, 14)}...]`;
-  try {
-    const oEmbedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/playlist?list=${playlistId}`);
-    if (oEmbedRes.ok) {
-      const d = await oEmbedRes.json();
-      if (d.title) playlistTitle = d.title;
-    }
-  } catch(e){}
+  const oembedEndpoints = [
+    `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/playlist?list=${playlistId}`)}&format=json`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://www.youtube.com/oembed?url=https://www.youtube.com/playlist?list=${playlistId}&format=json`)}`
+  ];
+
+  for (const ep of oembedEndpoints) {
+    try {
+      const oEmbedRes = await fetch(ep);
+      if (oEmbedRes.ok) {
+        let d = await oEmbedRes.json();
+        if (d && d.contents && typeof d.contents === 'string') {
+          try { d = JSON.parse(d.contents); } catch(_) {}
+        }
+        if (d && d.title) {
+          playlistTitle = d.title;
+          break;
+        }
+      }
+    } catch(e){}
+  }
 
   return [{
     id: playlistId,

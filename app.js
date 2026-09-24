@@ -1,13 +1,14 @@
 // Main Orchestrator Module (ES Module Entry Point)
-import { state, elements } from './js/state.js';
-import { getAudioDuration, showToast } from './js/utils.js';
-import { initTheme } from './js/theme.js';
-import { saveAudioBlob, clearStoredAudios } from './js/db.js';
-import { triggerTransitionBridge } from './js/chime.js';
-import { parseYouTubeInput, fetchPlaylistItems } from './js/youtube.js';
-import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js';
-import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js';
-import { exportConfigToJson, importConfigFromJson } from './js/storage.js';
+const V = '?v=' + Date.now();
+import { state, elements } from './js/state.js?v=3.2';
+import { getAudioDuration, showToast } from './js/utils.js?v=3.2';
+import { initTheme } from './js/theme.js?v=3.2';
+import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=3.2';
+import { triggerTransitionBridge } from './js/chime.js?v=3.2';
+import { parseYouTubeInput, fetchPlaylistItems } from './js/youtube.js?v=3.2';
+import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=3.2';
+import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=3.2';
+import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=3.2';
 
 // Local Audio Uploader (Music)
 elements.musicFileInput.addEventListener('change', async (e) => {
