@@ -42,21 +42,28 @@ export async function fetchPlaylistItems(playlistId) {
     `https://inv.nadeko.net/api/v1/playlists/${playlistId}`,
     `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
     `https://invidious.drgns.space/api/v1/playlists/${playlistId}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
     `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
-    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`
+    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`
   ];
 
   for (const url of endpoints) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
       if (res.ok) {
-        const data = await res.json();
-        // Piped response format
+        let data = await res.json();
+        // Si viene envuelto por el proxy de AllOrigins
+        if (data && data.contents && typeof data.contents === 'string') {
+          try {
+            data = JSON.parse(data.contents);
+          } catch (_) {}
+        }
+        
+        // Formato Piped
         if (data && Array.isArray(data.relatedStreams) && data.relatedStreams.length > 0) {
           const mapped = data.relatedStreams.map(v => {
             let vId = v.url ? v.url.replace('/watch?v=', '').split('&')[0] : v.id;
@@ -68,7 +75,7 @@ export async function fetchPlaylistItems(playlistId) {
           }).filter(v => v.id && v.id.length === 11);
           if (mapped.length > 0) return mapped;
         }
-        // Invidious response format
+        // Formato Invidious
         if (data && Array.isArray(data.videos) && data.videos.length > 0) {
           const mapped = data.videos.map(v => ({
             id: v.videoId,
@@ -81,7 +88,65 @@ export async function fetchPlaylistItems(playlistId) {
     } catch(e) {}
   }
 
-  // Fallback: Embed as direct YouTube Playlist Player container
+  // Fallback 2: Intentar extraer títulos y IDs directamente mediante el IFrame API si está disponible
+  try {
+    const ytItems = await new Promise((resolve) => {
+      const tempDiv = document.createElement('div');
+      tempDiv.id = 'yt_temp_extractor_' + Math.random().toString(36).substr(2, 6);
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+
+      let resolved = false;
+      const done = (items) => {
+        if (!resolved) {
+          resolved = true;
+          try { player.destroy(); } catch (_) {}
+          try { tempDiv.remove(); } catch (_) {}
+          resolve(items);
+        }
+      };
+
+      const timer = setTimeout(() => done(null), 5000);
+
+      const player = new YT.Player(tempDiv.id, {
+        height: '10',
+        width: '10',
+        playerVars: {
+          listType: 'playlist',
+          list: playlistId
+        },
+        events: {
+          onReady: (e) => {
+            try {
+              const playlistIds = e.target.getPlaylist();
+              if (Array.isArray(playlistIds) && playlistIds.length > 0) {
+                clearTimeout(timer);
+                const results = playlistIds.map((vId, idx) => ({
+                  id: vId,
+                  title: `Pista #${idx + 1} [${vId}]`,
+                  duration: null
+                }));
+                done(results);
+                return;
+              }
+            } catch (_) {}
+            done(null);
+          },
+          onError: () => {
+            clearTimeout(timer);
+            done(null);
+          }
+        }
+      });
+    });
+
+    if (ytItems && ytItems.length > 0) {
+      return ytItems;
+    }
+  } catch (e) {}
+
+  // Fallback 3: Si todo falla, incrustar la playlist completa
   let playlistTitle = `Playlist de YouTube [${playlistId.substring(0, 14)}...]`;
   try {
     const oEmbedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/playlist?list=${playlistId}`);

@@ -301,6 +301,14 @@ export function playIndex(index, isCrossfadeTransition = false) {
               if (event.data === YT.PlayerState.PLAYING) {
                 setPlayingUI(true);
                 startVisualizer();
+                // Si es un contenedor de playlist, obtener título real del video actual que YouTube está sonando
+                try {
+                  const pData = ytPlayer.getVideoData();
+                  if (pData && pData.title && track.isPlaylist) {
+                    elements.currentTrackTitle.textContent = pData.title;
+                    track.title = pData.title;
+                  }
+                } catch (_) {}
               } else if (event.data === YT.PlayerState.PAUSED) {
                 setPlayingUI(false);
               } else if (event.data === YT.PlayerState.ENDED) {
