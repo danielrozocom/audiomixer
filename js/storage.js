@@ -30,6 +30,10 @@ export async function exportConfigToJson() {
         }
       }
 
+      const ytUrl = item.source === 'youtube' 
+        ? (item.url || (item.isPlaylist ? `https://www.youtube.com/playlist?list=${item.playlistId || item.ytId}` : `https://www.youtube.com/watch?v=${item.ytId}`))
+        : null;
+
       return {
         id: item.id,
         title: item.title,
@@ -38,6 +42,7 @@ export async function exportConfigToJson() {
         audioData: audioData,
         fileName: item.fileName || (item.source === 'local' ? item.title : null),
         ytId: item.ytId || null,
+        url: ytUrl,
         duration: item.duration || null,
       };
     }));
@@ -109,12 +114,15 @@ export async function importConfigFromJson(file) {
           const id = item.id || (item.source === 'local' ? 'loc_' : 'yt_') + Math.random().toString(36).substr(2, 9);
           
           if (item.source === 'youtube') {
+            const ytId = item.ytId || (item.url ? (item.url.match(/[?&]v=([^&#]+)/) || [])[1] : null);
+            const ytUrl = item.url || (ytId ? `https://www.youtube.com/watch?v=${ytId}` : null);
             result.push({
               id: id,
               title: item.title,
               type: type,
               source: 'youtube',
-              ytId: item.ytId,
+              ytId: ytId,
+              url: ytUrl,
               duration: item.duration || null
             });
           } else {

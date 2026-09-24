@@ -93,13 +93,27 @@ elements.importYtBtn.addEventListener('click', async () => {
   for (const item of parsedItems) {
     if (item.type === 'video') {
       let title = `YouTube Audio [${item.id}]`;
+      const ytUrl = `https://www.youtube.com/watch?v=${item.id}`;
+      
+      // Intentar obtener el título real mediante oEmbed
       try {
-        const oEmbedRes = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${item.id}`);
-        if (oEmbedRes.ok) {
-          const d = await oEmbedRes.json();
-          if (d.title) title = d.title;
+        const oembedUrls = [
+          `https://noembed.com/embed?url=${encodeURIComponent(ytUrl)}`,
+          `https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`
+        ];
+        for (const endpoint of oembedUrls) {
+          try {
+            const res = await fetch(endpoint);
+            if (res.ok) {
+              const d = await res.json();
+              if (d && d.title) {
+                title = d.title;
+                break;
+              }
+            }
+          } catch (_) {}
         }
-      } catch(e){}
+      } catch (e) {}
 
       const track = {
         id: 'yt_' + Math.random().toString(36).substr(2, 9),
@@ -107,6 +121,7 @@ elements.importYtBtn.addEventListener('click', async () => {
         type: category,
         source: 'youtube',
         ytId: item.id,
+        url: ytUrl,
         duration: null
       };
 
@@ -128,6 +143,7 @@ elements.importYtBtn.addEventListener('click', async () => {
           type: category,
           source: 'youtube',
           ytId: v.id,
+          url: v.isPlaylistContainer ? `https://www.youtube.com/playlist?list=${item.id}` : `https://www.youtube.com/watch?v=${v.id}`,
           isPlaylist: v.isPlaylistContainer || false,
           playlistId: item.id,
           duration: v.duration
