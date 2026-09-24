@@ -321,20 +321,23 @@ export function playIndex(index, isCrossfadeTransition = false) {
           }
         });
       } else {
-        ytPlayer.setVolume(state.isMuted ? 0 : 100);
-        if (track.isPlaylist && track.playlistId) {
-          ytPlayer.loadPlaylist({ list: track.playlistId, listType: 'playlist' });
-        } else {
-          ytPlayer.loadVideoById(track.ytId);
-        }
-        ytPlayer.playVideo();
+        try {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(state.isMuted ? 0 : 100);
+          if (track.isPlaylist && track.playlistId) {
+            ytPlayer.loadPlaylist({ list: track.playlistId, listType: 'playlist' });
+          } else {
+            ytPlayer.loadVideoById(track.ytId);
+          }
+          ytPlayer.playVideo();
+        } catch (_) {}
       }
     };
 
     if (window.YT && window.YT.Player) {
       initOrLoadYt();
     } else {
-      setTimeout(initOrLoadYt, 300);
+      setTimeout(initOrLoadYt, 500);
     }
 
     setPlayingUI(true);
