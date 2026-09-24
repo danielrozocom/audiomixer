@@ -35,15 +35,14 @@ export function parseYouTubeInput(rawText) {
 
 export async function fetchPlaylistItems(playlistId) {
   const endpoints = [
-    `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
-    `https://api.piped.privacydev.net/playlists/${playlistId}`,
-    `https://piped-api.lunar.icu/playlists/${playlistId}`,
-    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
+    `https://invidious.jing.rocks/api/v1/playlists/${playlistId}`,
+    `https://yewtu.be/api/v1/playlists/${playlistId}`,
+    `https://inv.nadeko.net/api/v1/playlists/${playlistId}`,
+    `https://invidious.drgns.space/api/v1/playlists/${playlistId}`,
     `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
-    `https://inv.tux.pizza/api/v1/playlists/${playlistId}`,
-    `https://invidious.privacydev.net/api/v1/playlists/${playlistId}`,
-    `https://invidious.flokinet.to/api/v1/playlists/${playlistId}`,
-    `https://vid.puffyan.us/api/v1/playlists/${playlistId}`
+    `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
+    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
+    `https://api.piped.privacydev.net/playlists/${playlistId}`
   ];
 
   for (const url of endpoints) {
