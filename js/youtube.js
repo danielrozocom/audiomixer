@@ -6,25 +6,29 @@ export function parseYouTubeInput(rawText) {
   const results = [];
 
   linesOrTokens.forEach(input => {
+    // Detectar parámetro list= en cualquier URL (ej: youtube.com/playlist?list=PL...&si=...)
     const playlistMatch = input.match(/[?&]list=([a-zA-Z0-9_-]+)/i);
     if (playlistMatch && playlistMatch[1] && !playlistMatch[1].startsWith('LL') && !playlistMatch[1].startsWith('WL')) {
       results.push({ type: 'playlist', id: playlistMatch[1], raw: input });
       return;
     }
 
-    if (/^(PL|UU|FL|RD|OLAK5uy_)[a-zA-Z0-9_-]{10,}$/i.test(input)) {
+    // Detectar si pasaron directamente el ID de la playlist
+    if (/^(PL|UU|FL|RD|OLAK5uy_)[a-zA-Z0-9_-]{5,}$/i.test(input)) {
       results.push({ type: 'playlist', id: input, raw: input });
       return;
     }
 
-    const videoRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    // Detectar video individual por URL
+    const videoRegExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
     const videoMatch = input.match(videoRegExp);
-    if (videoMatch && videoMatch[2].length === 11) {
-      results.push({ type: 'video', id: videoMatch[2], raw: input });
+    if (videoMatch && videoMatch[1]) {
+      results.push({ type: 'video', id: videoMatch[1], raw: input });
       return;
     }
 
-    if (input.length === 11 && !input.includes('/') && !input.includes('.')) {
+    // Detectar video por ID directo de 11 caracteres
+    if (input.length === 11 && !input.includes('/') && !input.includes('.') && !input.includes('?') && !input.includes('&')) {
       results.push({ type: 'video', id: input, raw: input });
       return;
     }
