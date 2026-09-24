@@ -88,63 +88,42 @@ export async function fetchPlaylistItems(playlistId) {
     } catch(e) {}
   }
 
-  // Fallback 2: Intentar extraer títulos y IDs directamente mediante el IFrame API si está disponible
-  try {
-    const ytItems = await new Promise((resolve) => {
-      const tempDiv = document.createElement('div');
-      tempDiv.id = 'yt_temp_extractor_' + Math.random().toString(36).substr(2, 6);
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      document.body.appendChild(tempDiv);
+  // Fallback 2: Scraping directo de YouTube Web vía CORS Proxy
+  const corsProxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://www.youtube.com/playlist?list=${playlistId}`)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://www.youtube.com/playlist?list=${playlistId}`)}`,
+    `https://corsproxy.io/?${encodeURIComponent(`https://www.youtube.com/playlist?list=${playlistId}`)}`
+  ];
 
-      let resolved = false;
-      const done = (items) => {
-        if (!resolved) {
-          resolved = true;
-          try { player.destroy(); } catch (_) {}
-          try { tempDiv.remove(); } catch (_) {}
-          resolve(items);
-        }
-      };
-
-      const timer = setTimeout(() => done(null), 5000);
-
-      const player = new YT.Player(tempDiv.id, {
-        height: '10',
-        width: '10',
-        playerVars: {
-          listType: 'playlist',
-          list: playlistId
-        },
-        events: {
-          onReady: (e) => {
-            try {
-              const playlistIds = e.target.getPlaylist();
-              if (Array.isArray(playlistIds) && playlistIds.length > 0) {
-                clearTimeout(timer);
-                const results = playlistIds.map((vId, idx) => ({
-                  id: vId,
-                  title: `Pista #${idx + 1} [${vId}]`,
-                  duration: null
-                }));
-                done(results);
-                return;
+  for (const proxyUrl of corsProxies) {
+    try {
+      const res = await fetch(proxyUrl);
+      if (res.ok) {
+        const html = await res.text();
+        const jsonMatch = html.match(/var ytInitialData = ({.*?});<\/script>/s) || html.match(/window\["ytInitialData"\] = ({.*?});<\/script>/s);
+        if (jsonMatch) {
+          const ytData = JSON.parse(jsonMatch[1]);
+          const tabs = ytData.contents?.twoColumnBrowseResultsRenderer?.tabs;
+          const tab = tabs?.find(t => t.tabRenderer?.content?.sectionListRenderer);
+          const contents = tab?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.playlistVideoListRenderer?.contents;
+          if (Array.isArray(contents) && contents.length > 0) {
+            const items = [];
+            contents.forEach(c => {
+              const v = c.playlistVideoRenderer;
+              if (v && v.videoId) {
+                items.push({
+                  id: v.videoId,
+                  title: v.title?.runs?.[0]?.text || v.title?.simpleText || `YouTube Audio [${v.videoId}]`,
+                  duration: v.lengthSeconds ? parseInt(v.lengthSeconds) : null
+                });
               }
-            } catch (_) {}
-            done(null);
-          },
-          onError: () => {
-            clearTimeout(timer);
-            done(null);
+            });
+            if (items.length > 0) return items;
           }
         }
-      });
-    });
-
-    if (ytItems && ytItems.length > 0) {
-      return ytItems;
-    }
-  } catch (e) {}
+      }
+    } catch (_) {}
+  }
 
   // Fallback 3: Si todo falla, incrustar la playlist completa
   let playlistTitle = `Playlist de YouTube [${playlistId.substring(0, 14)}...]`;
