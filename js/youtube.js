@@ -39,14 +39,13 @@ export function parseYouTubeInput(rawText) {
 
 export async function fetchPlaylistItems(playlistId) {
   const endpoints = [
-    `https://invidious.jing.rocks/api/v1/playlists/${playlistId}`,
-    `https://yewtu.be/api/v1/playlists/${playlistId}`,
     `https://inv.nadeko.net/api/v1/playlists/${playlistId}`,
-    `https://invidious.drgns.space/api/v1/playlists/${playlistId}`,
     `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
+    `https://invidious.drgns.space/api/v1/playlists/${playlistId}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
     `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
-    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
-    `https://api.piped.privacydev.net/playlists/${playlistId}`
+    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`
   ];
 
   for (const url of endpoints) {
