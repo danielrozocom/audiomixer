@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=3.7';
-import { formatTime, showToast } from './utils.js?v=3.7';
-import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.7';
-import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.7';
+import { state, elements } from './state.js?v=3.9';
+import { formatTime, showToast } from './utils.js?v=3.9';
+import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.9';
+import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.9';
 
 export let ytPlayer = null;
 export let ytReady = !!(window.YT && window.YT.Player);
@@ -367,6 +367,10 @@ export function playIndex(index, isCrossfadeTransition = false) {
 
     setPlayingUI(true);
     startVisualizer();
+  }
+
+  if (track && track.type === 'jingle' && track.id) {
+    state.playedJingles.add(track.id);
   }
 
   state.isCrossfading = false;

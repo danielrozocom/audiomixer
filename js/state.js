@@ -18,6 +18,7 @@ export const state = {
   activeDeck: 'A',    // 'A' or 'B' for crossfading local audio
   draggedItemIndex: null,
   draggedItemType: null, // 'queue', 'music', or 'jingle'
+  playedJingles: new Set(), // Track which jingles have been played in current queue cycle
 };
 
 // DOM Elements

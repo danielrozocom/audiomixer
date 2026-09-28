@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=3.7';
-import { formatTime, showToast, escapeHtml } from './utils.js?v=3.7';
-import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=3.7';
-import { playIndex, playNext } from './player.js?v=3.7';
+import { state, elements } from './state.js?v=3.9';
+import { formatTime, showToast, escapeHtml } from './utils.js?v=3.9';
+import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=3.9';
+import { playIndex, playNext } from './player.js?v=3.9';
 
 // Setup Drag and Drop
 export function setupDragItem(el, index, listType) {
@@ -98,6 +98,7 @@ export function setupDragItem(el, index, listType) {
 
 // Rebuild Interleaved Queue based on current ratio
 export function rebuildQueue() {
+  state.playedJingles = new Set();
   if (state.musicPool.length === 0 && state.jinglesPool.length === 0) {
     state.queue = [];
     state.currentIndex = -1;
@@ -118,14 +119,26 @@ export function rebuildQueue() {
   } else if (jinglesList.length === 0) {
     newQueue.push(...musicList);
   } else {
+    const jinglesQueue = [];
+    const refillJingles = () => {
+      const unplayed = jinglesList.filter(j => !state.playedJingles.has(j.id));
+      const played = jinglesList.filter(j => state.playedJingles.has(j.id));
+      const combined = [...unplayed, ...played];
+      for (let i = combined.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [combined[i], combined[j]] = [combined[j], combined[i]];
+      }
+      jinglesQueue.push(...combined);
+    };
+
     while (mIdx < musicList.length) {
       for (let i = 0; i < ratio && mIdx < musicList.length; i++) {
         newQueue.push(musicList[mIdx]);
         mIdx++;
       }
       if (jinglesList.length > 0) {
-        newQueue.push(jinglesList[jIdx % jinglesList.length]);
-        jIdx++;
+        if (jinglesQueue.length === 0) refillJingles();
+        newQueue.push(jinglesQueue.shift());
       }
     }
   }
