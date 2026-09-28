@@ -1,14 +1,14 @@
 // Main Orchestrator Module (ES Module Entry Point)
-const V = '?v=4.4';
-import { state, elements } from './js/state.js?v=4.4';
-import { getAudioDuration, showToast, escapeHtml, formatTime } from './js/utils.js?v=4.4';
-import { initTheme } from './js/theme.js?v=4.4';
-import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=4.4';
-import { triggerTransitionBridge } from './js/chime.js?v=4.4';
-import { parseYouTubeInput, fetchPlaylistItems, fetchDurations, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=4.4';
-import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=4.4';
-import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=4.4';
-import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=4.4';
+const V = '?v=4.6';
+import { state, elements } from './js/state.js?v=4.6';
+import { getAudioDuration, showToast, escapeHtml, formatTime } from './js/utils.js?v=4.6';
+import { initTheme } from './js/theme.js?v=4.6';
+import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=4.6';
+import { triggerTransitionBridge } from './js/chime.js?v=4.6';
+import { parseYouTubeInput, fetchPlaylistItems, fetchDurations, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=4.6';
+import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=4.6';
+import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=4.6';
+import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=4.6';
 
 // Local Audio Uploader (Music)
 elements.musicFileInput.addEventListener('change', async (e) => {

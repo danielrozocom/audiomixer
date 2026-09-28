@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=4.4';
-import { formatTime, showToast, escapeHtml } from './utils.js?v=4.4';
-import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=4.4';
-import { playIndex, playNext } from './player.js?v=4.4';
+import { state, elements } from './state.js?v=4.6';
+import { formatTime, showToast, escapeHtml } from './utils.js?v=4.6';
+import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=4.6';
+import { playIndex, playNext } from './player.js?v=4.6';
 
 // Setup Drag and Drop
 export function setupDragItem(el, index, listType) {
@@ -119,27 +119,21 @@ export function rebuildQueue() {
   } else if (jinglesList.length === 0) {
     newQueue.push(...musicList);
   } else {
-    const jinglesQueue = [];
-    const refillJingles = () => {
-      const unplayed = jinglesList.filter(j => !state.playedJingles.has(j.id));
-      const played = jinglesList.filter(j => state.playedJingles.has(j.id));
-      const combined = [...unplayed, ...played];
-      for (let i = combined.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [combined[i], combined[j]] = [combined[j], combined[i]];
-      }
-      jinglesQueue.push(...combined);
-    };
+    // Índice circular por el pool de anuncios.
+    // Avanza en orden estricto; solo "vuelve al inicio" cuando se han
+    // usado TODOS los anuncios al menos una vez (ciclo completo).
+    // Así cada anuncio aparece exactamente una vez por ciclo, y la
+    // repetición solo ocurre cuando hay más canciones que anuncios.
+    let jingleCursor = 0;
 
     while (mIdx < musicList.length) {
       for (let i = 0; i < ratio && mIdx < musicList.length; i++) {
         newQueue.push(musicList[mIdx]);
         mIdx++;
       }
-      if (jinglesList.length > 0) {
-        if (jinglesQueue.length === 0) refillJingles();
-        newQueue.push(jinglesQueue.shift());
-      }
+      // Insertar el siguiente anuncio en orden (circular)
+      newQueue.push(jinglesList[jingleCursor % jinglesList.length]);
+      jingleCursor++;
     }
   }
 
