@@ -454,19 +454,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// YouTube API Key Settings
-const ytApiKeyInput = document.getElementById('ytApiKeyInput');
-const saveYtApiKeyBtn = document.getElementById('saveYtApiKeyBtn');
-
-if (ytApiKeyInput && saveYtApiKeyBtn) {
-  ytApiKeyInput.value = getYouTubeApiKey();
-  saveYtApiKeyBtn.addEventListener('click', () => {
-    const val = ytApiKeyInput.value.trim();
-    setYouTubeApiKey(val);
-    showToast("Clave API de YouTube guardada", "success");
-  });
-}
-
 // Initialize YouTube auto-sync preference
 const autoSyncEl = document.getElementById('autoSyncPlaylists');
 if (autoSyncEl) {

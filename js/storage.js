@@ -14,12 +14,14 @@ function getAutoSyncPreference() {
 export async function exportConfigToJson() {
   showToast("Preparando exportación con datos de audio...", "info");
 
+  const linkPlaylists = getAutoSyncPreference();
+
   const preparePoolExport = async (pool) => {
     const result = [];
     const playlistVideos = {};
 
     for (const item of pool) {
-      if (item.source === 'youtube' && item.isPlaylist && item.playlistId) {
+      if (linkPlaylists && item.source === 'youtube' && item.isPlaylist && item.playlistId) {
         if (!playlistVideos[item.playlistId]) {
           result.push({
             id: item.id,
