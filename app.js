@@ -467,6 +467,12 @@ if (ytApiKeyInput && saveYtApiKeyBtn) {
   });
 }
 
+// Initialize YouTube auto-sync preference
+const autoSyncEl = document.getElementById('autoSyncPlaylists');
+if (autoSyncEl) {
+  autoSyncEl.checked = localStorage.getItem('audiomix_autosync') === '1';
+}
+
 // Initialize Theme
 initTheme();
 
