@@ -8,6 +8,38 @@ export let ytReady = !!(window.YT && window.YT.Player);
 let progressTimer = null;
 let visualizerTimer = null;
 
+// ─── Handlers dinámicos para ytPlayer ──────────────────────────────────────────
+// Se usan como callbacks del YT.Player para que siempre lean el track ACTUAL
+// desde state en vez de capturar un closure del track en el momento de creación.
+function _ytOnStateChange(event) {
+  if (event.data === YT.PlayerState.PLAYING) {
+    setPlayingUI(true);
+    startVisualizer();
+    // Actualizar título si es playlist (YouTube sabe qué canción está sonando)
+    try {
+      const currentTrack = state.currentIndex >= 0 ? state.queue[state.currentIndex] : null;
+      const pData = ytPlayer && ytPlayer.getVideoData ? ytPlayer.getVideoData() : null;
+      if (pData && pData.title && currentTrack && currentTrack.isPlaylist) {
+        elements.currentTrackTitle.textContent = pData.title;
+        currentTrack.title = pData.title;
+      }
+    } catch (_) {}
+  } else if (event.data === YT.PlayerState.PAUSED) {
+    setPlayingUI(false);
+  } else if (event.data === YT.PlayerState.ENDED) {
+    handleTrackEnd();
+  }
+}
+
+function _ytOnError(err) {
+  console.warn('YouTube player error code:', err.data);
+  if (err.data === 150 || err.data === 101 || err.data === 100) {
+    showToast('Pista omitida: el video tiene restricciones de reproducción de YouTube', 'warning');
+    setTimeout(() => playNext(false), 1200);
+  }
+}
+// ───────────────────────────────────────────────────────────────────────────────
+
 // Ensure YouTube Iframe API ready callback works in all browser contexts
 const prevOnReady = window.onYouTubeIframeAPIReady;
 window.onYouTubeIframeAPIReady = function() {
@@ -282,8 +314,9 @@ export function playIndex(index, isCrossfadeTransition = false) {
 
     const initOrLoadYt = () => {
       if (!ytPlayer || !ytPlayer.loadVideoById) {
-        // Para playlists: NO pasar videoId inicial (evita ID inválido y doble reproducción)
-        // Para videos sueltos: pasar el ytId directamente
+        // Crear el player POR PRIMERA VEZ
+        // Para playlists: NO pasar videoId inicial (evita "Invalid video id")
+        // Los handlers apuntan a funciones del módulo (dinámicas), no closures del track
         const playerConfig = {
           height: '100%',
           width: '100%',
@@ -302,49 +335,28 @@ export function playIndex(index, isCrossfadeTransition = false) {
             onReady: (event) => {
               ytReady = true;
               event.target.setVolume(state.isMuted ? 0 : 100);
-              if (track.isPlaylist && track.playlistId) {
-                // Carga la playlist directamente (sin video placeholder previo)
-                event.target.loadPlaylist({ list: track.playlistId, listType: 'playlist' });
-              } else {
-                event.target.loadVideoById(track.ytId);
+              // Leer el track ACTUAL (no el closure capturado)
+              const currentTrack = state.currentIndex >= 0 ? state.queue[state.currentIndex] : null;
+              if (currentTrack && currentTrack.isPlaylist && currentTrack.playlistId) {
+                event.target.loadPlaylist({ list: currentTrack.playlistId, listType: 'playlist' });
+              } else if (currentTrack && currentTrack.ytId) {
+                event.target.loadVideoById(currentTrack.ytId);
               }
             },
-            onStateChange: (event) => {
-              if (event.data === YT.PlayerState.PLAYING) {
-                setPlayingUI(true);
-                startVisualizer();
-                // Si es un contenedor de playlist, obtener título real del video actual que YouTube está sonando
-                try {
-                  const pData = ytPlayer.getVideoData();
-                  if (pData && pData.title && track.isPlaylist) {
-                    elements.currentTrackTitle.textContent = pData.title;
-                    track.title = pData.title;
-                  }
-                } catch (_) {}
-              } else if (event.data === YT.PlayerState.PAUSED) {
-                setPlayingUI(false);
-              } else if (event.data === YT.PlayerState.ENDED) {
-                handleTrackEnd();
-              }
-            },
-            onError: (err) => {
-              console.warn("YouTube player error code:", err.data);
-              // Códigos de error de YouTube: 100/101/150 (video restringido o no reproducible en iframe)
-              if (err.data === 150 || err.data === 101 || err.data === 100) {
-                showToast(`Pista omitida: el video tiene restricciones de reproducción de YouTube`, "warning");
-                setTimeout(() => playNext(false), 1200);
-              }
-            }
+            onStateChange: _ytOnStateChange,
+            onError: _ytOnError
           }
         };
 
-        // Solo pasar videoId si NO es playlist (evita "Invalid video id" con placeholder)
+        // Solo pasar videoId si NO es playlist
         if (!track.isPlaylist && track.ytId) {
           playerConfig.videoId = track.ytId;
         }
 
         ytPlayer = new YT.Player('ytPlayerDiv', playerConfig);
       } else {
+        // Reutilizar el player existente — los handlers ya son dinámicos,
+        // simplemente cargamos el nuevo contenido
         try {
           ytPlayer.unMute();
           ytPlayer.setVolume(state.isMuted ? 0 : 100);
@@ -354,7 +366,7 @@ export function playIndex(index, isCrossfadeTransition = false) {
             ytPlayer.loadVideoById(track.ytId);
           }
         } catch (e) {
-          console.error("Error playing video:", e);
+          console.error('Error al cargar video/playlist en ytPlayer:', e);
         }
       }
     };
@@ -370,12 +382,12 @@ export function playIndex(index, isCrossfadeTransition = false) {
           initOrLoadYt();
         } else if (retries > 10) {
           clearInterval(checkYt);
-          console.warn("YouTube IFrame API could not load in time.");
+          console.warn('YouTube IFrame API could not load in time.');
         }
       }, 300);
     }
-    // NO llamar setPlayingUI(true)/startVisualizer() aquí —
-    // el onStateChange del player lo hará cuando YouTube confirme que está reproduciendo
+    // NO llamar setPlayingUI/startVisualizer aquí:
+    // _ytOnStateChange lo hará cuando YouTube confirme PLAYING
   }
 
   if (track && track.type === 'jingle' && track.id) {
