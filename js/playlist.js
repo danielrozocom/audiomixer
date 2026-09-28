@@ -1,7 +1,7 @@
-import { state, elements } from './state.js';
-import { formatTime, showToast } from './utils.js';
-import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js';
-import { playIndex, playNext } from './player.js';
+import { state, elements } from './state.js?v=3.6';
+import { formatTime, showToast, escapeHtml } from './utils.js?v=3.6';
+import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=3.6';
+import { playIndex, playNext } from './player.js?v=3.6';
 
 // Setup Drag and Drop
 export function setupDragItem(el, index, listType) {
@@ -174,7 +174,7 @@ export function renderAllLists() {
               : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
           }">${isJingle ? 'Anuncio' : 'Música'}</span>
           <div class="truncate flex-1">
-            <p class="font-medium truncate ${isCurrent ? 'text-indigo-600 dark:text-indigo-200 font-bold' : 'text-zinc-800 dark:text-zinc-200'}">${item.title}</p>
+            <p class="font-medium truncate ${isCurrent ? 'text-indigo-600 dark:text-indigo-200 font-bold' : 'text-zinc-800 dark:text-zinc-200'}">${escapeHtml(item.title)}</p>
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function renderAllLists() {
         <div class="flex items-center gap-2 truncate flex-1">
           <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-400"></i>
           <div class="truncate flex-1">
-            <p class="font-medium text-zinc-800 dark:text-zinc-200 truncate">${item.title}</p>
+            <p class="font-medium text-zinc-800 dark:text-zinc-200 truncate">${escapeHtml(item.title)}</p>
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>
@@ -237,7 +237,7 @@ export function renderAllLists() {
         <div class="flex items-center gap-2 truncate flex-1">
           <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-zinc-400"></i>
           <div class="truncate flex-1">
-            <p class="font-medium text-amber-700 dark:text-amber-200 truncate">${item.title}</p>
+            <p class="font-medium text-amber-700 dark:text-amber-200 truncate">${escapeHtml(item.title)}</p>
             <span class="text-[10px] text-zinc-400 capitalize">${item.source} ${item.duration ? '• ' + formatTime(item.duration) : ''}</span>
           </div>
         </div>

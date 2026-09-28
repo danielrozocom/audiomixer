@@ -1,14 +1,14 @@
 // Main Orchestrator Module (ES Module Entry Point)
-const V = '?v=' + Date.now();
-import { state, elements } from './js/state.js?v=3.2';
-import { getAudioDuration, showToast } from './js/utils.js?v=3.2';
-import { initTheme } from './js/theme.js?v=3.2';
-import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=3.2';
-import { triggerTransitionBridge } from './js/chime.js?v=3.2';
-import { parseYouTubeInput, fetchPlaylistItems } from './js/youtube.js?v=3.2';
-import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=3.2';
-import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=3.2';
-import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=3.2';
+const V = '?v=3.6';
+import { state, elements } from './js/state.js?v=3.6';
+import { getAudioDuration, showToast, escapeHtml } from './js/utils.js?v=3.6';
+import { initTheme } from './js/theme.js?v=3.6';
+import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=3.6';
+import { triggerTransitionBridge } from './js/chime.js?v=3.6';
+import { parseYouTubeInput, fetchPlaylistItems, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=3.6';
+import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=3.6';
+import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=3.6';
+import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=3.6';
 
 // Local Audio Uploader (Music)
 elements.musicFileInput.addEventListener('change', async (e) => {
@@ -91,63 +91,40 @@ elements.importYtBtn.addEventListener('click', async () => {
 
   let addedCount = 0;
 
-  for (const item of parsedItems) {
-    if (item.type === 'video') {
-      let title = `YouTube Audio [${item.id}]`;
-      const ytUrl = `https://www.youtube.com/watch?v=${item.id}`;
-      
-      // Intentar obtener el título real mediante oEmbed
-      try {
-        const oembedUrls = [
-          `https://noembed.com/embed?url=${encodeURIComponent(ytUrl)}`,
-          `https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`
-        ];
-        for (const endpoint of oembedUrls) {
-          try {
-            const res = await fetch(endpoint);
-            if (res.ok) {
-              const d = await res.json();
-              if (d && d.title) {
-                title = d.title;
-                break;
+  try {
+    for (const item of parsedItems) {
+      if (item.type === 'video') {
+        let title = `YouTube Audio [${item.id}]`;
+        const ytUrl = `https://www.youtube.com/watch?v=${item.id}`;
+        
+        // Intentar obtener el título real mediante oEmbed
+        try {
+          const oembedUrls = [
+            `https://noembed.com/embed?url=${encodeURIComponent(ytUrl)}`,
+            `https://www.youtube.com/oembed?url=${encodeURIComponent(ytUrl)}&format=json`
+          ];
+          for (const endpoint of oembedUrls) {
+            try {
+              const res = await fetch(endpoint);
+              if (res.ok) {
+                const d = await res.json();
+                if (d && d.title) {
+                  title = d.title;
+                  break;
+                }
               }
-            }
-          } catch (_) {}
-        }
-      } catch (e) {}
+            } catch (_) {}
+          }
+        } catch (e) {}
 
-      const track = {
-        id: 'yt_' + Math.random().toString(36).substr(2, 9),
-        title: title,
-        type: category,
-        source: 'youtube',
-        ytId: item.id,
-        url: ytUrl,
-        duration: null
-      };
-
-      if (category === 'music') {
-        state.musicPool.push(track);
-      } else {
-        state.jinglesPool.push(track);
-      }
-      addedCount++;
-
-    } else if (item.type === 'playlist') {
-      showToast("Extrayendo elementos de la Playlist de YouTube...", "info");
-      const videos = await fetchPlaylistItems(item.id);
-
-      videos.forEach(v => {
         const track = {
           id: 'yt_' + Math.random().toString(36).substr(2, 9),
-          title: v.title,
+          title: title,
           type: category,
           source: 'youtube',
-          ytId: v.id,
-          url: v.isPlaylistContainer ? `https://www.youtube.com/playlist?list=${item.id}` : `https://www.youtube.com/watch?v=${v.id}`,
-          isPlaylist: v.isPlaylistContainer || false,
-          playlistId: item.id,
-          duration: v.duration
+          ytId: item.id,
+          url: ytUrl,
+          duration: null
         };
 
         if (category === 'music') {
@@ -156,16 +133,59 @@ elements.importYtBtn.addEventListener('click', async () => {
           state.jinglesPool.push(track);
         }
         addedCount++;
-      });
+
+      } else if (item.type === 'playlist') {
+        showToast("Extrayendo elementos de la Playlist de YouTube...", "info");
+        const videos = await fetchPlaylistItems(item.id);
+
+        if (!videos || videos.length === 0) {
+          showToast(`No se encontraron videos en la playlist [${item.id}]`, "warning");
+          continue;
+        }
+
+        videos.forEach(v => {
+          const track = {
+            id: 'yt_' + Math.random().toString(36).substr(2, 9),
+            title: v.title,
+            type: category,
+            source: 'youtube',
+            ytId: v.id,
+            url: v.isPlaylistContainer ? `https://www.youtube.com/playlist?list=${item.id}` : `https://www.youtube.com/watch?v=${v.id}`,
+            isPlaylist: v.isPlaylistContainer || false,
+            playlistId: item.id,
+            duration: v.duration
+          };
+
+          if (category === 'music') {
+            state.musicPool.push(track);
+          } else {
+            state.jinglesPool.push(track);
+          }
+          addedCount++;
+        });
+      }
     }
+  } catch (err) {
+    console.error("Error durante la importación de YouTube:", err);
+    showToast("Ocurrió un error al procesar la lista: " + (err.message || err), "error");
+  } finally {
+    elements.importYtBtn.disabled = false;
+    elements.importYtBtnText.textContent = "Importar Playlist / Video";
   }
 
-  elements.importYtBtn.disabled = false;
-  elements.importYtBtnText.textContent = "Importar Playlist / Video";
-  elements.ytUrlInput.value = '';
-  rebuildQueue();
-
-  showToast(`¡Se importaron ${addedCount} elemento(s) desde YouTube a ${category === 'music' ? 'Música' : 'Anuncios'}!`, "success");
+  if (addedCount > 0) {
+    elements.ytUrlInput.value = '';
+    rebuildQueue();
+    // Cambiar a la pestaña correspondiente para que el usuario vea inmediatamente sus pistas
+    if (category === 'music' && typeof switchTab === 'function') {
+      switchTab('music');
+    } else if (category === 'jingle' && typeof switchTab === 'function') {
+      switchTab('jingles');
+    }
+    showToast(`¡Se agregaron ${addedCount} pista(s) desde YouTube a ${category === 'music' ? 'Música' : 'Anuncios'} y a la Cola!`, "success");
+  } else {
+    showToast("No se pudo agregar ninguna pista. Revisa la URL o ID ingresado.", "warning");
+  }
 });
 
 // Clear All
@@ -341,6 +361,19 @@ window.addEventListener('keydown', (e) => {
     playPrev();
   }
 });
+
+// YouTube API Key Settings
+const ytApiKeyInput = document.getElementById('ytApiKeyInput');
+const saveYtApiKeyBtn = document.getElementById('saveYtApiKeyBtn');
+
+if (ytApiKeyInput && saveYtApiKeyBtn) {
+  ytApiKeyInput.value = getYouTubeApiKey();
+  saveYtApiKeyBtn.addEventListener('click', () => {
+    const val = ytApiKeyInput.value.trim();
+    setYouTubeApiKey(val);
+    showToast("Clave API de YouTube guardada", "success");
+  });
+}
 
 // Initialize Theme
 initTheme();

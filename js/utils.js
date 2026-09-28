@@ -1,4 +1,15 @@
-import { elements } from './state.js';
+import { elements } from './state.js?v=3.6';
+
+// Escape HTML to prevent XSS and broken DOM templates
+export function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // Format Seconds to MM:SS
 export function formatTime(seconds) {

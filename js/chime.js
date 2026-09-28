@@ -1,4 +1,4 @@
-import { state, elements } from './state.js';
+import { state, elements } from './state.js?v=3.6';
 
 let sharedAudioCtx = null;
 export function getSharedAudioContext() {

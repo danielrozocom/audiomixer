@@ -1,5 +1,19 @@
 // YouTube Parser & Playlist Extractor Helper Module
 
+const DEFAULT_YT_API_KEY = 'AIzaSyBNp0w3U54Uofp2qtcm8wydm4ufJ7pqBsg';
+
+export function getYouTubeApiKey() {
+  return localStorage.getItem('audiomix_yt_api_key') || DEFAULT_YT_API_KEY;
+}
+
+export function setYouTubeApiKey(key) {
+  if (key) {
+    localStorage.setItem('audiomix_yt_api_key', key.trim());
+  } else {
+    localStorage.removeItem('audiomix_yt_api_key');
+  }
+}
+
 export function parseYouTubeInput(rawText) {
   if (!rawText) return [];
   const linesOrTokens = rawText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
@@ -37,15 +51,67 @@ export function parseYouTubeInput(rawText) {
   return results;
 }
 
-export async function fetchPlaylistItems(playlistId) {
+export async function fetchPlaylistItems(playlistId, customApiKey = null) {
+  const apiKey = customApiKey || getYouTubeApiKey();
+
+  // MÉTODO 1 (OFICIAL Y DIRECTO): YouTube Data API v3
+  if (apiKey) {
+    try {
+      let items = [];
+      let nextPageToken = '';
+
+      // Obtener todos los elementos de la playlist sin límite de páginas
+      while (true) {
+        let apiUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${apiKey}`;
+        if (nextPageToken) {
+          apiUrl += `&pageToken=${nextPageToken}`;
+        }
+
+        const res = await fetch(apiUrl);
+        if (!res.ok) {
+          console.warn(`YouTube Data API respondió con error ${res.status}`);
+          break;
+        }
+
+        const data = await res.json();
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
+          data.items.forEach(item => {
+            const snippet = item.snippet;
+            const videoId = snippet?.resourceId?.videoId;
+            const title = snippet?.title;
+
+            // Ignorar videos privados o eliminados
+            if (videoId && title && !title.includes('Private video') && !title.includes('Deleted video')) {
+              items.push({
+                id: videoId,
+                title: title,
+                duration: null
+              });
+            }
+          });
+
+          nextPageToken = data.nextPageToken;
+          if (!nextPageToken) break;
+        } else {
+          break;
+        }
+      }
+
+      if (items.length > 0) {
+        return items;
+      }
+    } catch (err) {
+      console.warn("YouTube Data API fetch failed, trying fallbacks:", err);
+    }
+  }
+
+  // Fallback 1: Instancias públicas Piped / Invidious API
   const endpoints = [
-    `https://inv.nadeko.net/api/v1/playlists/${playlistId}`,
-    `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
-    `https://invidious.drgns.space/api/v1/playlists/${playlistId}`,
     `https://pipedapi.kavin.rocks/playlists/${playlistId}`,
-    `https://pipedapi.tokhmi.xyz/playlists/${playlistId}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(`https://inv.nadeko.net/api/v1/playlists/${playlistId}`)}`
+    `https://api.piped.privacydev.net/playlists/${playlistId}`,
+    `https://inv.tux.pizza/api/v1/playlists/${playlistId}`,
+    `https://invidious.nerdvpn.de/api/v1/playlists/${playlistId}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://pipedapi.kavin.rocks/playlists/${playlistId}`)}`
   ];
 
   for (const url of endpoints) {

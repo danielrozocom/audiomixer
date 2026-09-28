@@ -1,7 +1,7 @@
-import { state, elements } from './state.js';
-import { blobToBase64, base64ToBlob, showToast } from './utils.js';
-import { getAudioBlob, saveAudioBlob } from './db.js';
-import { rebuildQueue } from './playlist.js';
+import { state, elements } from './state.js?v=3.6';
+import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=3.6';
+import { getAudioBlob, saveAudioBlob } from './db.js?v=3.6';
+import { rebuildQueue } from './playlist.js?v=3.6';
 
 export async function exportConfigToJson() {
   showToast("Preparando exportación con datos de audio...", "info");

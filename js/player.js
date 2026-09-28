@@ -1,16 +1,22 @@
-import { state, elements } from './state.js';
-import { formatTime, showToast } from './utils.js';
-import { triggerTransitionBridge, ytChimePlayer } from './chime.js';
-import { renderAllLists, updateCycleProgress } from './playlist.js';
+import { state, elements } from './state.js?v=3.6';
+import { formatTime, showToast } from './utils.js?v=3.6';
+import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.6';
+import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.6';
 
 export let ytPlayer = null;
-export let ytReady = false;
+export let ytReady = !!(window.YT && window.YT.Player);
 let progressTimer = null;
 let visualizerTimer = null;
 
+// Ensure YouTube Iframe API ready callback works in all browser contexts
+const prevOnReady = window.onYouTubeIframeAPIReady;
 window.onYouTubeIframeAPIReady = function() {
   ytReady = true;
+  if (typeof prevOnReady === 'function') prevOnReady();
 };
+if (window.YT && window.YT.Player) {
+  ytReady = true;
+}
 
 export function getActiveLocalPlayer() {
   return state.activeDeck === 'A' ? elements.deckA : elements.deckB;
@@ -288,6 +294,8 @@ export function playIndex(index, isCrossfadeTransition = false) {
             modestbranding: 1,
             rel: 0,
             playsinline: 1,
+            enablejsapi: 1,
+            origin: window.location.origin,
             listType: track.isPlaylist ? 'playlist' : undefined,
             list: track.isPlaylist ? track.playlistId : undefined,
           },
@@ -316,7 +324,12 @@ export function playIndex(index, isCrossfadeTransition = false) {
               }
             },
             onError: (err) => {
-              console.warn("YouTube player error:", err);
+              console.warn("YouTube player error code:", err.data);
+              // Códigos de error de YouTube: 100/101/150 (video restringido o no reproducible en iframe)
+              if (err.data === 150 || err.data === 101 || err.data === 100) {
+                showToast(`Pista omitida: el video tiene restricciones de reproducción de YouTube`, "warning");
+                setTimeout(() => playNext(false), 1200);
+              }
             }
           }
         });
@@ -330,14 +343,26 @@ export function playIndex(index, isCrossfadeTransition = false) {
             ytPlayer.loadVideoById(track.ytId);
           }
           ytPlayer.playVideo();
-        } catch (_) {}
+        } catch (e) {
+          console.error("Error playing video:", e);
+        }
       }
     };
 
     if (window.YT && window.YT.Player) {
       initOrLoadYt();
     } else {
-      setTimeout(initOrLoadYt, 500);
+      let retries = 0;
+      const checkYt = setInterval(() => {
+        retries++;
+        if (window.YT && window.YT.Player) {
+          clearInterval(checkYt);
+          initOrLoadYt();
+        } else if (retries > 10) {
+          clearInterval(checkYt);
+          console.warn("YouTube IFrame API could not load in time.");
+        }
+      }, 300);
     }
 
     setPlayingUI(true);
