@@ -1,4 +1,4 @@
-import { elements } from './state.js?v=4.3';
+import { elements } from './state.js?v=4.4';
 
 // Escape HTML to prevent XSS and broken DOM templates
 export function escapeHtml(str) {

@@ -1,14 +1,14 @@
 // Main Orchestrator Module (ES Module Entry Point)
-const V = '?v=4.3';
-import { state, elements } from './js/state.js?v=4.3';
-import { getAudioDuration, showToast, escapeHtml, formatTime } from './js/utils.js?v=4.3';
-import { initTheme } from './js/theme.js?v=4.3';
-import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=4.3';
-import { triggerTransitionBridge } from './js/chime.js?v=4.3';
-import { parseYouTubeInput, fetchPlaylistItems, fetchDurations, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=4.3';
-import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=4.3';
-import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=4.3';
-import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=4.3';
+const V = '?v=4.4';
+import { state, elements } from './js/state.js?v=4.4';
+import { getAudioDuration, showToast, escapeHtml, formatTime } from './js/utils.js?v=4.4';
+import { initTheme } from './js/theme.js?v=4.4';
+import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=4.4';
+import { triggerTransitionBridge } from './js/chime.js?v=4.4';
+import { parseYouTubeInput, fetchPlaylistItems, fetchDurations, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=4.4';
+import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=4.4';
+import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=4.4';
+import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=4.4';
 
 // Local Audio Uploader (Music)
 elements.musicFileInput.addEventListener('change', async (e) => {
@@ -182,12 +182,7 @@ elements.importYtBtn.addEventListener('click', async () => {
   if (addedCount > 0) {
     elements.ytUrlInput.value = '';
     rebuildQueue();
-    // Cambiar a la pestaña correspondiente para que el usuario vea inmediatamente sus pistas
-    if (category === 'music' && typeof switchTab === 'function') {
-      switchTab('music');
-    } else if (category === 'jingle' && typeof switchTab === 'function') {
-      switchTab('jingles');
-    }
+    // Quedarse en la pestaña Cola para que el usuario vea la rotación actualizada
     showToast(`¡Se agregaron ${addedCount} pista(s) desde YouTube a ${category === 'music' ? 'Música' : 'Anuncios'} y a la Cola!`, "success");
   } else {
     showToast("No se pudo agregar ninguna pista. Revisa la URL o ID ingresado.", "warning");

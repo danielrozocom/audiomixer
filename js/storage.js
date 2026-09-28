@@ -1,8 +1,8 @@
-import { state, elements } from './state.js?v=4.3';
-import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=4.3';
-import { getAudioBlob, saveAudioBlob } from './db.js?v=4.3';
-import { rebuildQueue } from './playlist.js?v=4.3';
-import { fetchPlaylistItems } from './youtube.js?v=4.3';
+import { state, elements } from './state.js?v=4.4';
+import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=4.4';
+import { getAudioBlob, saveAudioBlob } from './db.js?v=4.4';
+import { rebuildQueue } from './playlist.js?v=4.4';
+import { fetchPlaylistItems } from './youtube.js?v=4.4';
 
 function getAutoSyncPreference() {
   const el = document.getElementById('autoSyncPlaylists');
