@@ -23,24 +23,26 @@ export async function exportConfigToJson() {
     for (const item of pool) {
       if (linkPlaylists && item.source === 'youtube' && item.isPlaylist && item.playlistId) {
         if (!playlistVideos[item.playlistId]) {
-          result.push({
+          const plEntry = {
             id: item.id,
             title: item.title,
             type: item.type,
             source: 'youtube',
             isPlaylist: true,
             playlistId: item.playlistId,
-            duration: null,
             _playlistRef: true
-          });
+          };
+          if (item.duration) plEntry.duration = item.duration;
+          result.push(plEntry);
           playlistVideos[item.playlistId] = [];
         }
         if (item.ytId && item.ytId !== item.playlistId) {
-          playlistVideos[item.playlistId].push({
+          const vidEntry = {
             ytId: item.ytId,
-            title: item.title,
-            duration: item.duration || null
-          });
+            title: item.title
+          };
+          if (item.duration) vidEntry.duration = item.duration;
+          playlistVideos[item.playlistId].push(vidEntry);
         }
       } else {
         let audioData = null;
@@ -69,17 +71,18 @@ export async function exportConfigToJson() {
           ? (item.url || `https://www.youtube.com/watch?v=${item.ytId}`)
           : null;
 
-        result.push({
+        const entry = {
           id: item.id,
           title: item.title,
           type: item.type,
           source: item.source,
-          audioData: audioData,
-          fileName: item.fileName || (item.source === 'local' ? item.title : null),
-          ytId: item.ytId || null,
-          url: ytUrl,
-          duration: item.duration || null,
-        });
+        };
+        if (audioData) entry.audioData = audioData;
+        if (item.fileName) entry.fileName = item.fileName;
+        if (item.ytId) entry.ytId = item.ytId;
+        if (ytUrl) entry.url = ytUrl;
+        if (item.duration) entry.duration = item.duration;
+        result.push(entry);
       }
     }
 
@@ -107,7 +110,6 @@ export async function exportConfigToJson() {
       crossfadeDuration: state.crossfadeDuration,
       autoDj: state.autoDj,
       volume: state.volume,
-      theme: state.theme,
     },
     musicPool: musicExport.items,
     adsPool: adsExport.items
