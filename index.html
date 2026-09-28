@@ -313,9 +313,15 @@
 
           <div class="flex gap-2">
             <button id="importYtBtn"
-              class="w-full bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 text-xs py-2.5 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5 shadow-sm">
+              class="flex-1 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 text-xs py-2.5 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5 shadow-sm">
               <i data-lucide="list-plus" class="w-4 h-4"></i>
               <span id="importYtBtnText">Importar Playlist / Video</span>
+            </button>
+            <button id="refreshPlaylistsBtn"
+              class="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 text-xs py-2.5 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5 shadow-sm"
+              title="Actualizar todas las playlists importadas">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              <span>Actualizar</span>
             </button>
           </div>
 
@@ -330,11 +336,15 @@
               <div class="flex gap-1.5">
                 <input type="password" id="ytApiKeyInput" placeholder="Clave API de YouTube Data v3"
                   class="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-dark-border focus:border-indigo-500 rounded px-2 py-1 text-[11px] text-zinc-800 dark:text-zinc-100 font-mono outline-none">
-                <button type="button" id="saveYtApiKeyBtn"
+            <button type="button" id="saveYtApiKeyBtn"
                   class="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 px-2 py-1 rounded text-[11px] font-medium transition">
-                  Guardar
-                </button>
-              </div>
+              Guardar
+            </button>
+            <label class="flex items-center gap-1.5 cursor-pointer mt-2">
+              <input type="checkbox" id="autoSyncPlaylists" class="rounded">
+              <span>Sincronizar playlists al importar (solo futuros)</span>
+            </label>
+          </div>
               <p class="text-[10px] text-zinc-400">
                 La API oficial de Google carga listas completas al instante sin bloqueos CORS.
               </p>

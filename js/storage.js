@@ -2,58 +2,103 @@ import { state, elements } from './state.js?v=3.6';
 import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=3.6';
 import { getAudioBlob, saveAudioBlob } from './db.js?v=3.6';
 import { rebuildQueue } from './playlist.js?v=3.6';
+import { fetchPlaylistItems } from './youtube.js?v=3.6';
+
+function getAutoSyncPreference() {
+  const el = document.getElementById('autoSyncPlaylists');
+  const sync = el ? el.checked : false;
+  localStorage.setItem('audiomix_autosync', sync ? '1' : '0');
+  return sync;
+}
 
 export async function exportConfigToJson() {
   showToast("Preparando exportación con datos de audio...", "info");
 
   const preparePoolExport = async (pool) => {
-    return Promise.all(pool.map(async (item) => {
-      let audioData = null;
-      if (item.source === 'local') {
-        let blob = item.blob;
-        if (!blob && item.id) {
-          const stored = await getAudioBlob(item.id);
-          if (stored && stored.blob) blob = stored.blob;
+    const result = [];
+    const playlistVideos = {};
+
+    for (const item of pool) {
+      if (item.source === 'youtube' && item.isPlaylist && item.playlistId) {
+        if (!playlistVideos[item.playlistId]) {
+          result.push({
+            id: item.id,
+            title: item.title,
+            type: item.type,
+            source: 'youtube',
+            isPlaylist: true,
+            playlistId: item.playlistId,
+            duration: null,
+            _playlistRef: true
+          });
+          playlistVideos[item.playlistId] = [];
         }
-        if (!blob && item.url && item.url.startsWith('blob:')) {
-          try {
-            const res = await fetch(item.url);
-            blob = await res.blob();
-          } catch(e){}
+        if (item.ytId && item.ytId !== item.playlistId) {
+          playlistVideos[item.playlistId].push({
+            ytId: item.ytId,
+            title: item.title,
+            duration: item.duration || null
+          });
         }
-        if (blob) {
-          try {
-            audioData = await blobToBase64(blob);
-          } catch (e) {
-            console.warn("Could not encode audio to base64", e);
+      } else {
+        let audioData = null;
+        if (item.source === 'local') {
+          let blob = item.blob;
+          if (!blob && item.id) {
+            const stored = await getAudioBlob(item.id);
+            if (stored && stored.blob) blob = stored.blob;
+          }
+          if (!blob && item.url && item.url.startsWith('blob:')) {
+            try {
+              const res = await fetch(item.url);
+              blob = await res.blob();
+            } catch(e){}
+          }
+          if (blob) {
+            try {
+              audioData = await blobToBase64(blob);
+            } catch (e) {
+              console.warn("Could not encode audio to base64", e);
+            }
           }
         }
+
+        const ytUrl = item.source === 'youtube' 
+          ? (item.url || `https://www.youtube.com/watch?v=${item.ytId}`)
+          : null;
+
+        result.push({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          source: item.source,
+          audioData: audioData,
+          fileName: item.fileName || (item.source === 'local' ? item.title : null),
+          ytId: item.ytId || null,
+          url: ytUrl,
+          duration: item.duration || null,
+        });
       }
+    }
 
-      const ytUrl = item.source === 'youtube' 
-        ? (item.url || (item.isPlaylist ? `https://www.youtube.com/playlist?list=${item.playlistId || item.ytId}` : `https://www.youtube.com/watch?v=${item.ytId}`))
-        : null;
-
-      return {
-        id: item.id,
-        title: item.title,
-        type: item.type,
-        source: item.source,
-        audioData: audioData,
-        fileName: item.fileName || (item.source === 'local' ? item.title : null),
-        ytId: item.ytId || null,
-        url: ytUrl,
-        duration: item.duration || null,
-      };
-    }));
+    return { items: result, playlists: playlistVideos };
   };
 
-  const exportedMusic = await preparePoolExport(state.musicPool);
-  const exportedAds = await preparePoolExport(state.jinglesPool);
+  const musicExport = await preparePoolExport(state.musicPool);
+  const adsExport = await preparePoolExport(state.jinglesPool);
+
+  const allPlaylists = {};
+  Object.assign(allPlaylists, musicExport.playlists);
+  Object.keys(adsExport.playlists).forEach(pid => {
+    if (!allPlaylists[pid]) allPlaylists[pid] = [];
+    allPlaylists[pid] = allPlaylists[pid].concat(adsExport.playlists[pid]);
+  });
+
+  const hasPlaylists = Object.keys(allPlaylists).length > 0;
 
   const data = {
     app: 'AudioMix',
-    version: '3.0',
+    version: '3.1',
     exportDate: new Date().toISOString(),
     settings: {
       rotationRatio: state.rotationRatio,
@@ -62,9 +107,13 @@ export async function exportConfigToJson() {
       volume: state.volume,
       theme: state.theme,
     },
-    musicPool: exportedMusic,
-    adsPool: exportedAds
+    musicPool: musicExport.items,
+    adsPool: adsExport.items
   };
+
+  if (hasPlaylists) {
+    data.playlists = allPlaylists;
+  }
 
   const jsonStr = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -98,6 +147,8 @@ export async function importConfigFromJson(file) {
         return;
       }
 
+      const autoSync = getAutoSyncPreference();
+
       if (imported.settings) {
         if (typeof imported.settings.rotationRatio === 'number') {
           state.rotationRatio = imported.settings.rotationRatio;
@@ -112,19 +163,63 @@ export async function importConfigFromJson(file) {
         const result = [];
         for (const item of items) {
           const id = item.id || (item.source === 'local' ? 'loc_' : 'yt_') + Math.random().toString(36).substr(2, 9);
-          
+
           if (item.source === 'youtube') {
-            const ytId = item.ytId || (item.url ? (item.url.match(/[?&]v=([^&#]+)/) || [])[1] : null);
-            const ytUrl = item.url || (ytId ? `https://www.youtube.com/watch?v=${ytId}` : null);
-            result.push({
-              id: id,
-              title: item.title,
-              type: type,
-              source: 'youtube',
-              ytId: ytId,
-              url: ytUrl,
-              duration: item.duration || null
-            });
+            if (item.isPlaylist && item.playlistId) {
+              result.push({
+                id: id,
+                title: item.title,
+                type: type,
+                source: 'youtube',
+                ytId: item.playlistId,
+                url: `https://www.youtube.com/playlist?list=${item.playlistId}`,
+                isPlaylist: true,
+                playlistId: item.playlistId,
+                duration: null
+              });
+
+              let playlistVideos = (imported.playlists && imported.playlists[item.playlistId]) || [];
+
+              if (autoSync) {
+                try {
+                  showToast(`Sincronizando playlist ${item.playlistId}...`, "info");
+                  const freshVideos = await fetchPlaylistItems(item.playlistId);
+                  if (freshVideos && freshVideos.length > 0) {
+                    playlistVideos = freshVideos
+                      .filter(v => !v.isPlaylistContainer)
+                      .map(v => ({ ytId: v.id, title: v.title, duration: v.duration || null }));
+                  }
+                } catch (syncErr) {
+                  console.warn("No se pudo sincronizar playlist:", syncErr);
+                }
+              }
+
+              playlistVideos.forEach(v => {
+                result.push({
+                  id: 'yt_' + Math.random().toString(36).substr(2, 9),
+                  title: v.title || `YouTube Audio [${v.ytId}]`,
+                  type: type,
+                  source: 'youtube',
+                  ytId: v.ytId,
+                  url: `https://www.youtube.com/watch?v=${v.ytId}`,
+                  isPlaylist: true,
+                  playlistId: item.playlistId,
+                  duration: v.duration || null
+                });
+              });
+            } else {
+              const ytId = item.ytId || (item.url ? (item.url.match(/[?&]v=([^&#]+)/) || [])[1] : null);
+              const ytUrl = item.url || (ytId ? `https://www.youtube.com/watch?v=${ytId}` : null);
+              result.push({
+                id: id,
+                title: item.title,
+                type: type,
+                source: 'youtube',
+                ytId: ytId,
+                url: ytUrl,
+                duration: item.duration || null
+              });
+            }
           } else {
             let blob = null;
             let url = null;

@@ -5,7 +5,7 @@ import { getAudioDuration, showToast, escapeHtml } from './js/utils.js?v=3.6';
 import { initTheme } from './js/theme.js?v=3.6';
 import { saveAudioBlob, clearStoredAudios } from './js/db.js?v=3.6';
 import { triggerTransitionBridge } from './js/chime.js?v=3.6';
-import { parseYouTubeInput, fetchPlaylistItems, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=3.6';
+import { parseYouTubeInput, fetchPlaylistItems, fetchDurations, getYouTubeApiKey, setYouTubeApiKey } from './js/youtube.js?v=3.6';
 import { setupDragItem, rebuildQueue, renderAllLists, updateCycleProgress } from './js/playlist.js?v=3.6';
 import { togglePlayPause, playNext, playPrev, playIndex, handleTrackEnd, updateProgress, getActiveLocalPlayer, ytPlayer, setIsSeeking } from './js/player.js?v=3.6';
 import { exportConfigToJson, importConfigFromJson } from './js/storage.js?v=3.6';
@@ -117,6 +117,12 @@ elements.importYtBtn.addEventListener('click', async () => {
           }
         } catch (e) {}
 
+        let duration = null;
+        try {
+          const d = await fetchDurations([item.id]);
+          duration = d[item.id] || null;
+        } catch (_) {}
+
         const track = {
           id: 'yt_' + Math.random().toString(36).substr(2, 9),
           title: title,
@@ -124,7 +130,7 @@ elements.importYtBtn.addEventListener('click', async () => {
           source: 'youtube',
           ytId: item.id,
           url: ytUrl,
-          duration: null
+          duration: duration
         };
 
         if (category === 'music') {
@@ -187,6 +193,92 @@ elements.importYtBtn.addEventListener('click', async () => {
     showToast("No se pudo agregar ninguna pista. Revisa la URL o ID ingresado.", "warning");
   }
 });
+
+// Refresh YouTube Playlists
+const refreshPlaylistsBtn = document.getElementById('refreshPlaylistsBtn');
+if (refreshPlaylistsBtn) {
+  refreshPlaylistsBtn.addEventListener('click', async () => {
+    const playlistItems = [];
+    state.musicPool.forEach((item, idx) => {
+      if (item.isPlaylist && item.playlistId) {
+        playlistItems.push({ item, pool: 'music', index: idx });
+      }
+    });
+    state.jinglesPool.forEach((item, idx) => {
+      if (item.isPlaylist && item.playlistId) {
+        playlistItems.push({ item, pool: 'jingle', index: idx });
+      }
+    });
+
+    if (playlistItems.length === 0) {
+      showToast("No hay playlists de YouTube para actualizar", "warning");
+      return;
+    }
+
+    refreshPlaylistsBtn.disabled = true;
+    const originalText = refreshPlaylistsBtn.innerHTML;
+    refreshPlaylistsBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4 animate-spin"></i><span>Actualizando...</span>';
+
+    let updatedCount = 0;
+    const seenPlaylists = new Set();
+
+    try {
+      for (const { item, pool } of playlistItems) {
+        if (seenPlaylists.has(item.playlistId)) continue;
+        seenPlaylists.add(item.playlistId);
+
+        showToast(`Actualizando playlist: ${item.playlistId}...`, "info");
+        const videos = await fetchPlaylistItems(item.playlistId);
+
+        if (!videos || videos.length === 0) continue;
+
+        const pool = pool === 'music' ? state.musicPool : state.jinglesPool;
+        const freshIds = new Set(videos.map(v => v.id));
+
+        for (let i = pool.length - 1; i >= 0; i--) {
+          const t = pool[i];
+          if (t.isPlaylist && t.playlistId === item.playlistId && t.ytId && !freshIds.has(t.ytId)) {
+            pool.splice(i, 1);
+          }
+        }
+
+        for (const v of videos) {
+          if (!v.isPlaylistContainer) continue;
+          const existing = pool.find(t => t.isPlaylist && t.playlistId === item.playlistId);
+          if (!existing) {
+            pool.push({
+              id: 'yt_' + Math.random().toString(36).substr(2, 9),
+              title: v.title,
+              type: pool === state.musicPool ? 'music' : 'jingle',
+              source: 'youtube',
+              ytId: v.id,
+              url: `https://www.youtube.com/playlist?list=${item.playlistId}`,
+              isPlaylist: true,
+              playlistId: item.playlistId,
+              duration: v.duration || null
+            });
+            updatedCount++;
+          }
+        }
+        updatedCount++;
+      }
+
+      if (updatedCount > 0) {
+        rebuildQueue();
+        showToast(`¡Se actualizaron ${updatedCount} playlist(s) de YouTube!`, "success");
+      } else {
+        showToast("Las playlists ya estaban al día", "info");
+      }
+    } catch (err) {
+      console.error("Error actualizando playlists:", err);
+      showToast("Ocurrió un error al actualizar las playlists", "error");
+    } finally {
+      refreshPlaylistsBtn.disabled = false;
+      refreshPlaylistsBtn.innerHTML = originalText;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+}
 
 // Clear All
 elements.clearAllBtn.addEventListener('click', async () => {

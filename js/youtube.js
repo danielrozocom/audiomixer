@@ -51,6 +51,40 @@ export function parseYouTubeInput(rawText) {
   return results;
 }
 
+export async function fetchDurations(videoIds, customApiKey = null) {
+  const apiKey = customApiKey || getYouTubeApiKey();
+  const durations = {};
+  if (!apiKey || videoIds.length === 0) return durations;
+
+  const chunks = [];
+  for (let i = 0; i < videoIds.length; i += 50) {
+    chunks.push(videoIds.slice(i, i + 50));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      const ids = chunk.join(',');
+      const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids}&key=${apiKey}`;
+      const res = await fetch(apiUrl);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data && Array.isArray(data.items)) {
+        data.items.forEach(item => {
+          const match = item.contentDetails?.duration?.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+          if (match) {
+            const h = parseInt(match[1] || '0', 10);
+            const m = parseInt(match[2] || '0', 10);
+            const s = parseInt(match[3] || '0', 10);
+            durations[item.id] = h * 3600 + m * 60 + s;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  return durations;
+}
+
 export async function fetchPlaylistItems(playlistId, customApiKey = null) {
   const apiKey = customApiKey || getYouTubeApiKey();
 
@@ -98,6 +132,10 @@ export async function fetchPlaylistItems(playlistId, customApiKey = null) {
       }
 
       if (items.length > 0) {
+        const durations = await fetchDurations(items.map(i => i.id), apiKey);
+        items.forEach(item => {
+          if (durations[item.id]) item.duration = durations[item.id];
+        });
         return items;
       }
     } catch (err) {
