@@ -1,8 +1,8 @@
-import { state, elements } from './state.js?v=3.9';
-import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=3.9';
-import { getAudioBlob, saveAudioBlob } from './db.js?v=3.9';
-import { rebuildQueue } from './playlist.js?v=3.9';
-import { fetchPlaylistItems } from './youtube.js?v=3.9';
+import { state, elements } from './state.js?v=4.0';
+import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=4.0';
+import { getAudioBlob, saveAudioBlob } from './db.js?v=4.0';
+import { rebuildQueue } from './playlist.js?v=4.0';
+import { fetchPlaylistItems } from './youtube.js?v=4.0';
 
 function getAutoSyncPreference() {
   const el = document.getElementById('autoSyncPlaylists');
@@ -258,8 +258,8 @@ export async function importConfigFromJson(file) {
         return result;
       };
 
-      const newMusic = await processItems(imported.musicPool, 'music');
-      const adsArray = imported.adsPool || imported.jinglesPool;
+      const newMusic = await processItems(imported.musicPool || [], 'music');
+      const adsArray = imported.adsPool || imported.jinglesPool || [];
       const newAds = await processItems(adsArray, 'jingle');
 
       state.musicPool = newMusic;
@@ -268,11 +268,19 @@ export async function importConfigFromJson(file) {
       state.currentIndex = -1;
       rebuildQueue();
       
-      showToast(`¡JSON importado sin duplicados! (${newMusic.length} música, ${newAds.length} anuncios)`, "success");
+      // Contar pistas locales pendientes (sin audio embebido)
+      const pendingLocal = [...newMusic, ...newAds].filter(t => t.isPendingLocal).length;
+      const totalImported = newMusic.length + newAds.length;
+
+      if (pendingLocal > 0) {
+        showToast(`¡JSON importado! (${newMusic.length} música, ${newAds.length} anuncios) — ⚠️ ${pendingLocal} pista(s) local(es) pendiente(s): recarga sus archivos de audio`, "warning");
+      } else {
+        showToast(`¡JSON importado correctamente! (${newMusic.length} música, ${newAds.length} anuncios)`, "success");
+      }
 
     } catch(err) {
       console.error("JSON Import error:", err);
-      showToast("Error al importar: archivo JSON inválido o dañado", "error");
+      showToast("Error al importar: archivo JSON inválido o dañado — " + (err.message || err), "error");
     }
   };
   reader.readAsText(file);

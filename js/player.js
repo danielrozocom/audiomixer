@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=3.9';
-import { formatTime, showToast } from './utils.js?v=3.9';
-import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.9';
-import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.9';
+import { state, elements } from './state.js?v=4.0';
+import { formatTime, showToast } from './utils.js?v=4.0';
+import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=4.0';
+import { renderAllLists, updateCycleProgress } from './playlist.js?v=4.0';
 
 export let ytPlayer = null;
 export let ytReady = !!(window.YT && window.YT.Player);
@@ -282,10 +282,11 @@ export function playIndex(index, isCrossfadeTransition = false) {
 
     const initOrLoadYt = () => {
       if (!ytPlayer || !ytPlayer.loadVideoById) {
-        ytPlayer = new YT.Player('ytPlayerDiv', {
+        // Para playlists: NO pasar videoId inicial (evita ID inválido y doble reproducción)
+        // Para videos sueltos: pasar el ytId directamente
+        const playerConfig = {
           height: '100%',
           width: '100%',
-          videoId: track.isPlaylist ? undefined : track.ytId,
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -296,14 +297,17 @@ export function playIndex(index, isCrossfadeTransition = false) {
             playsinline: 1,
             enablejsapi: 1,
             origin: window.location.origin,
-            listType: track.isPlaylist ? 'playlist' : undefined,
-            list: track.isPlaylist ? track.playlistId : undefined,
           },
           events: {
             onReady: (event) => {
               ytReady = true;
               event.target.setVolume(state.isMuted ? 0 : 100);
-              event.target.playVideo();
+              if (track.isPlaylist && track.playlistId) {
+                // Carga la playlist directamente (sin video placeholder previo)
+                event.target.loadPlaylist({ list: track.playlistId, listType: 'playlist' });
+              } else {
+                event.target.loadVideoById(track.ytId);
+              }
             },
             onStateChange: (event) => {
               if (event.data === YT.PlayerState.PLAYING) {
@@ -332,7 +336,14 @@ export function playIndex(index, isCrossfadeTransition = false) {
               }
             }
           }
-        });
+        };
+
+        // Solo pasar videoId si NO es playlist (evita "Invalid video id" con placeholder)
+        if (!track.isPlaylist && track.ytId) {
+          playerConfig.videoId = track.ytId;
+        }
+
+        ytPlayer = new YT.Player('ytPlayerDiv', playerConfig);
       } else {
         try {
           ytPlayer.unMute();
@@ -342,7 +353,6 @@ export function playIndex(index, isCrossfadeTransition = false) {
           } else {
             ytPlayer.loadVideoById(track.ytId);
           }
-          ytPlayer.playVideo();
         } catch (e) {
           console.error("Error playing video:", e);
         }
@@ -364,9 +374,8 @@ export function playIndex(index, isCrossfadeTransition = false) {
         }
       }, 300);
     }
-
-    setPlayingUI(true);
-    startVisualizer();
+    // NO llamar setPlayingUI(true)/startVisualizer() aquí —
+    // el onStateChange del player lo hará cuando YouTube confirme que está reproduciendo
   }
 
   if (track && track.type === 'jingle' && track.id) {

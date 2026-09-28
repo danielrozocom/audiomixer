@@ -1,4 +1,4 @@
-import { elements, state } from './state.js?v=3.9';
+import { elements, state } from './state.js?v=4.0';
 
 export function applyTheme(theme) {
   state.theme = theme;
