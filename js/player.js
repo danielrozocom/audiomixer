@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=3.6';
-import { formatTime, showToast } from './utils.js?v=3.6';
-import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.6';
-import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.6';
+import { state, elements } from './state.js?v=3.7';
+import { formatTime, showToast } from './utils.js?v=3.7';
+import { triggerTransitionBridge, ytChimePlayer } from './chime.js?v=3.7';
+import { renderAllLists, updateCycleProgress } from './playlist.js?v=3.7';
 
 export let ytPlayer = null;
 export let ytReady = !!(window.YT && window.YT.Player);

@@ -1,8 +1,8 @@
-import { state, elements } from './state.js?v=3.6';
-import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=3.6';
-import { getAudioBlob, saveAudioBlob } from './db.js?v=3.6';
-import { rebuildQueue } from './playlist.js?v=3.6';
-import { fetchPlaylistItems } from './youtube.js?v=3.6';
+import { state, elements } from './state.js?v=3.7';
+import { blobToBase64, base64ToBlob, showToast } from './utils.js?v=3.7';
+import { getAudioBlob, saveAudioBlob } from './db.js?v=3.7';
+import { rebuildQueue } from './playlist.js?v=3.7';
+import { fetchPlaylistItems } from './youtube.js?v=3.7';
 
 function getAutoSyncPreference() {
   const el = document.getElementById('autoSyncPlaylists');
@@ -21,7 +21,7 @@ export async function exportConfigToJson() {
     const playlistVideos = {};
 
     for (const item of pool) {
-      if (linkPlaylists && item.source === 'youtube' && item.isPlaylist && item.playlistId) {
+      if (linkPlaylists && item.source === 'youtube' && item.playlistId) {
         if (!playlistVideos[item.playlistId]) {
           const plEntry = {
             id: item.id,

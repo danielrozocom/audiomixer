@@ -1,7 +1,7 @@
-import { state, elements } from './state.js?v=3.6';
-import { formatTime, showToast, escapeHtml } from './utils.js?v=3.6';
-import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=3.6';
-import { playIndex, playNext } from './player.js?v=3.6';
+import { state, elements } from './state.js?v=3.7';
+import { formatTime, showToast, escapeHtml } from './utils.js?v=3.7';
+import { deleteStoredAudio, saveAudioBlob, getAudioBlob } from './db.js?v=3.7';
+import { playIndex, playNext } from './player.js?v=3.7';
 
 // Setup Drag and Drop
 export function setupDragItem(el, index, listType) {
